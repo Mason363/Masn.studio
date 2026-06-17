@@ -3,27 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <title>Mason Chen | Portfolio</title>
     <meta name="description" content="Mason Chen - Interactive 3D Terminal Portfolio. Explore creative engineering, MakerWorld designs, and GitHub code." />
   </head>
   <body>
-    <!-- Background CRT particle grain and ASCII trail canvas -->
-    <canvas id="bg-canvas"></canvas>
+    <!-- Rotation root: rotated 90deg on portrait devices to force landscape -->
+    <div id="rotation-root">
+      <!-- Background CRT particle grain and ASCII trail canvas -->
+      <canvas id="bg-canvas"></canvas>
 
-    <!-- Custom Snapping Block Cursor -->
-    <div id="terminal-cursor"></div>
+      <!-- Custom Snapping Block Cursor -->
+      <div id="terminal-cursor"></div>
 
-    <!-- Mobile Portrait Warning Overlay -->
-    <div id="portrait-overlay">
-      <div class="warning-box">
-        <p class="blink">WARNING: PORTRAIT ORIENTATION DETECTED</p>
-        <p class="desc">LANDSCAPE ORIENTATION REQUIRED TO INITIALIZE CONSOLE.</p>
-        <div class="rotate-icon"></div>
-      </div>
-    </div>
-
-    <!-- Master Viewport Container -->
-    <div id="app-viewport">
+      <!-- Master Viewport Container -->
+      <div id="app-viewport">
       <div id="scroll-wrapper">
         
         <!-- STAGE 1: THE COMMAND -->
@@ -56,6 +50,7 @@
           </div>
         </section>
 
+        </div>
       </div>
     </div>
 

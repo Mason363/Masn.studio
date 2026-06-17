@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code tooling
+.claude/
+
+# Loose source assets (the favicon used by the site lives in public/favicon.png)
+/MC Icon v1.png

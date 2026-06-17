@@ -31,7 +31,6 @@ const bgCanvas = document.getElementById('bg-canvas');
 const bgCtx = bgCanvas.getContext('2d');
 const terminalCursor = document.getElementById('terminal-cursor');
 const scrollWrapper = document.getElementById('scroll-wrapper');
-const portraitOverlay = document.getElementById('portrait-overlay');
 const typewriterContainer = document.getElementById('typewriter-text');
 const stage1 = document.getElementById('stage-1');
 const threeContainer = document.getElementById('three-canvas-container');
@@ -308,33 +307,150 @@ function updateCursorPosition() {
     return;
   }
 
-  // --- STAGE 2: STRICT GRID SNAP SYSTEM ---
-  // Everything (letters, links, empty space) snaps to exactly one 10x7 grid cell.
-  // The cell the cursor sits in is the single source of truth for hover & clicks,
-  // so the visual cursor and the hit target can never disagree.
-  const { col, row } = activeCell();
+  // --- STAGE 2: SNAP SYSTEM ---
+  // Links snap to their full box (which spans several grid cells); letters snap
+  // to their projected 3D bounding box, so the cursor grows to fit whatever
+  // animation is playing and the whole animated glyph stays clickable.
+  const githubLink = document.querySelector('.terminal-link[data-link="github"]');
+  const makerworldLink = document.querySelector('.terminal-link[data-link="makerworld"]');
+  const clearLinkBlinks = () => {
+    if (githubLink) githubLink.classList.remove('blink-active');
+    if (makerworldLink) makerworldLink.classList.remove('blink-active');
+  };
+  const linkContentRect = (el) => el ? toContentRect(el.getBoundingClientRect()) : null;
+  const within = (r, x, y) => r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
 
-  // Resolve hovered letter (only the letter row, one column per letter)
-  hovered3DLetterGroup = null;
-  if (row === 2) {
-    const letterIndex = letterIndexForCol(col);
-    if (letterIndex >= 0 && letterIndex < letterGroups.length) {
-      hovered3DLetterGroup = letterGroups[letterIndex];
+  const { col, row } = activeCell();
+  // Mouse uses the precise pointer; keyboard uses the active cell's center.
+  const px = useKeyboardCursor ? (col + 0.5) * colWidth : mouseX;
+  const py = useKeyboardCursor ? (row + 0.5) * rowHeight : mouseY;
+
+  // 1. GITHUB link — generous multi-cell grid zone OR its own box; cursor fits the box.
+  const ghRect = linkContentRect(githubLink);
+  if (ghRect && (linkForCell(col, row) === 'github' || within(ghRect, px, py))) {
+    hovered3DLetterGroup = null;
+    clearLinkBlinks();
+    githubLink.classList.add('blink-active');
+    setCursorRect(ghRect.left, ghRect.top, ghRect.width, ghRect.height);
+    return;
+  }
+
+  // 2. MAKERWORLD link
+  const mwRect = linkContentRect(makerworldLink);
+  if (mwRect && (linkForCell(col, row) === 'makerworld' || within(mwRect, px, py))) {
+    hovered3DLetterGroup = null;
+    clearLinkBlinks();
+    makerworldLink.classList.add('blink-active');
+    setCursorRect(mwRect.left, mwRect.top, mwRect.width, mwRect.height);
+    return;
+  }
+
+  // 3. LETTERS — projected bounding-box hit test (fits the live animation).
+  if (camera && letterGroups.length) {
+    if (useKeyboardCursor) {
+      const li = (row === 2) ? letterIndexForCol(col) : -1;
+      if (li >= 0 && li < letterGroups.length) {
+        hovered3DLetterGroup = letterGroups[li];
+        const r = getProjectedRect(hovered3DLetterGroup);
+        clearLinkBlinks();
+        setCursorRect(r.left, r.top, r.width, r.height);
+        return;
+      }
+    } else {
+      for (let i = 0; i < letterGroups.length; i++) {
+        const r = getProjectedRect(letterGroups[i]);
+        if (within(r, px, py)) {
+          hovered3DLetterGroup = letterGroups[i];
+          clearLinkBlinks();
+          setCursorRect(r.left, r.top, r.width, r.height);
+          return;
+        }
+      }
     }
   }
 
-  // Resolve hovered link & drive the blink
-  const githubLink = document.querySelector('.terminal-link[data-link="github"]');
-  const makerworldLink = document.querySelector('.terminal-link[data-link="makerworld"]');
-  if (githubLink) githubLink.classList.remove('blink-active');
-  if (makerworldLink) makerworldLink.classList.remove('blink-active');
-
-  const link = linkForCell(col, row);
-  if (link === 'github' && githubLink) githubLink.classList.add('blink-active');
-  else if (link === 'makerworld' && makerworldLink) makerworldLink.classList.add('blink-active');
-
-  // Cursor always occupies the single grid cell under the pointer
+  // 4. Fallback: strict grid cell.
+  hovered3DLetterGroup = null;
+  clearLinkBlinks();
   setCursorRect(col * colWidth, row * rowHeight, colWidth, rowHeight);
+}
+
+// Project a 3D letter group's active representation into content-space pixels.
+// (The renderer draws into the rotated container, so projected pixels are already
+// in content space and need no extra rotation handling.)
+function getProjectedRect(group) {
+  const width = viewW;
+  const height = viewH;
+
+  // Always project the real geometry of the active representation so the cursor and
+  // hit area track exactly where the glyph is actually drawn — in every state,
+  // including the flat resting state.
+  let activeMesh = group.getObjectByName('meshText');
+  if (group.state === 1) activeMesh = group.getObjectByName('meshText3D');
+  else if (group.state === 2) activeMesh = group.getObjectByName('groupCAD');
+  else if (group.state === 3) activeMesh = group.getObjectByName('groupClaude');
+  else if (group.state === 4) activeMesh = group.getObjectByName('groupAntigravity');
+  else if (group.state === 5) activeMesh = group.getObjectByName('groupDesign');
+  else if (group.state === 6) activeMesh = group.getObjectByName('groupSignature');
+  else if (group.state === 7) activeMesh = group.getObjectByName('groupGlitch');
+  if (!activeMesh) activeMesh = group;
+
+  const worldPoints = [];
+  activeMesh.updateMatrixWorld(true);
+  activeMesh.traverse(child => {
+    if ((child.isMesh || child.isLine || child.isLineSegments) && child.geometry) {
+      const geom = child.geometry;
+      if (!geom.boundingBox) geom.computeBoundingBox();
+      const min = geom.boundingBox.min;
+      const max = geom.boundingBox.max;
+      const corners = [
+        new THREE.Vector3(min.x, min.y, min.z), new THREE.Vector3(min.x, min.y, max.z),
+        new THREE.Vector3(min.x, max.y, min.z), new THREE.Vector3(min.x, max.y, max.z),
+        new THREE.Vector3(max.x, min.y, min.z), new THREE.Vector3(max.x, min.y, max.z),
+        new THREE.Vector3(max.x, max.y, min.z), new THREE.Vector3(max.x, max.y, max.z)
+      ];
+      corners.forEach(pt => { pt.applyMatrix4(child.matrixWorld); worldPoints.push(pt); });
+    }
+  });
+
+  if (worldPoints.length === 0) {
+    const box = new THREE.Box3().setFromObject(activeMesh);
+    worldPoints.push(box.min.clone(), box.max.clone());
+  }
+
+  let minX = width, maxX = 0, minY = height, maxY = 0;
+  worldPoints.forEach(pt => {
+    pt.project(camera);
+    const x = ((pt.x + 1) * width) / 2;
+    const y = ((1 - pt.y) * height) / 2;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  });
+
+  // Default flat text: the cursor is the size of the original grid cell, but
+  // centered on the letter itself — the letter dictates where it snaps, while
+  // its grid cell only dictates the size. This stops the grid cell and the glyph
+  // from fighting over the cursor.
+  if (group.state === 0) {
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    return {
+      left: cx - colWidth / 2,
+      top: cy - rowHeight / 2,
+      width: colWidth,
+      height: rowHeight
+    };
+  }
+
+  const padding = 6;
+  return {
+    left: Math.max(0, minX - padding),
+    top: Math.max(0, minY - padding),
+    width: Math.max(0, maxX - minX + padding * 2),
+    height: Math.max(0, maxY - minY + padding * 2)
+  };
 }
 
 // --- STAGE 1: THE COMMAND SEQUENCE ---
@@ -1481,11 +1597,10 @@ function setupThreeEvents() {
 
     if (pressedMesh) {
       pressedMesh.depressZ = 0;
-      // Only cycle state if the cursor is still over the same letter on release.
-      if (hovered3DLetterGroup === pressedMesh) {
-        pressedMesh.state = (pressedMesh.state + 1) % 8;
-        updateLetterRepresentations(pressedMesh);
-      }
+      // The press already validated this was a letter, so a release always cycles
+      // it — this keeps clicks reliable even after the glyph has grown mid-animation.
+      pressedMesh.state = (pressedMesh.state + 1) % 8;
+      updateLetterRepresentations(pressedMesh);
       pressedMesh = null;
     }
   };
@@ -1493,40 +1608,31 @@ function setupThreeEvents() {
   window.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mouseup', onMouseUp);
 
-  // Fire links whenever the stylized cursor is over them (full grid zone, not just the <a> element)
+  // Fire links whenever the stylized cursor is over them — either the generous
+  // multi-cell grid zone or the link's own box (matches the cursor snap logic).
   window.addEventListener('click', () => {
     if (!isStageTransitioned) return;
-
-    const col = Math.floor(mouseX / colWidth);
-    const row = Math.floor(mouseY / rowHeight);
-
-    const githubLink = document.querySelector('.terminal-link[data-link="github"]');
-    const makerworldLink = document.querySelector('.terminal-link[data-link="makerworld"]');
-    const githubRect = githubLink ? githubLink.getBoundingClientRect() : null;
-    const makerworldRect = makerworldLink ? makerworldLink.getBoundingClientRect() : null;
-
-    const isOverGithubGrid = ((row === 5 || row === 6) && col >= 1 && col <= 3);
-    const isOverGithubRect = githubRect && mouseX >= githubRect.left && mouseX <= githubRect.right &&
-                             mouseY >= githubRect.top && mouseY <= githubRect.bottom;
-
-    if (isOverGithubGrid || isOverGithubRect) {
-      window.open('https://github.com/Mason363', '_blank');
-      return;
-    }
-
-    const isOverMakerworldGrid = ((row === 5 || row === 6) && col >= 6 && col <= 8);
-    const isOverMakerworldRect = makerworldRect && mouseX >= makerworldRect.left && mouseX <= makerworldRect.right &&
-                                 mouseY >= makerworldRect.top && mouseY <= makerworldRect.bottom;
-
-    if (isOverMakerworldGrid || isOverMakerworldRect) {
-      window.open('https://makerworld.com/en/@roboting', '_blank');
-    }
+    const { col, row } = activeCell();
+    const px = useKeyboardCursor ? (col + 0.5) * colWidth : mouseX;
+    const py = useKeyboardCursor ? (row + 0.5) * rowHeight : mouseY;
+    const hitLink = (el, name) => {
+      if (linkForCell(col, row) === name) return true;
+      if (!el) return false;
+      const r = toContentRect(el.getBoundingClientRect());
+      return px >= r.left && px <= r.left + r.width && py >= r.top && py <= r.top + r.height;
+    };
+    const gh = document.querySelector('.terminal-link[data-link="github"]');
+    const mw = document.querySelector('.terminal-link[data-link="makerworld"]');
+    if (hitLink(gh, 'github')) window.open('https://github.com/Mason363', '_blank');
+    else if (hitLink(mw, 'makerworld')) window.open('https://makerworld.com/en/@roboting', '_blank');
   });
 
   window.addEventListener('touchstart', (e) => {
     if (e.touches.length > 0) {
-      mouseX = e.touches[0].clientX;
-      mouseY = e.touches[0].clientY;
+      mouseX = toContentX(e.touches[0].clientX, e.touches[0].clientY);
+      mouseY = toContentY(e.touches[0].clientX, e.touches[0].clientY);
+      useKeyboardCursor = false;
+      updateCursorPosition(); // refresh hovered3DLetterGroup before the press
       onMouseDown();
     }
   });

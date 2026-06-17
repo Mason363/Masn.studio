@@ -20,13 +20,33 @@ html, body {
   cursor: none !important;
 }
 
-/* Background Canvas Layer (Grain, Trails, Bloom) */
-#bg-canvas {
+/* Rotation root: holds all visual content. On portrait devices it is rotated
+   90deg so the experience always renders in landscape. JS swaps the effective
+   width/height (viewW/viewH) and transforms pointer coordinates to match. */
+#rotation-root {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
+}
+
+body.force-rotate #rotation-root {
+  width: 100vh;          /* swapped dimensions */
+  height: 100vw;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+/* Background Canvas Layer (Grain, Trails, Bloom) */
+#bg-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 1;
   pointer-events: none;
 }
@@ -44,30 +64,26 @@ html, body {
 
 /* App Viewport Container (Disallows scrolling) */
 #app-viewport {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 10;
-  overflow: hidden;
-}
-
-/* Scroll Wrapper for transitions */
-#scroll-wrapper {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 200vh;
+  height: 100%;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Scroll Wrapper for transitions (width/height set in JS as px from viewW/viewH) */
+#scroll-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
 }
 
-/* Stage Layouts */
+/* Stage Layouts (width/height set in JS as px from viewW/viewH) */
 .stage {
-  width: 100vw;
-  height: 100vh;
   display: flex;
   position: relative;
   box-sizing: border-box;
@@ -130,30 +146,30 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   z-index: 5;
   pointer-events: auto;
 }
 
-/* Links Line placement */
+/* Links Line placement (percentages of the stage, which is sized in JS) */
 .links-line {
   position: absolute;
-  bottom: 8vh;
+  bottom: 10%;
   left: 0;
-  width: 100vw;
+  width: 100%;
   height: 50px;
   z-index: 100; /* High z-index to stay above canvas */
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Compact", sans-serif;
   font-weight: 700;
   letter-spacing: 0.1em;
-  pointer-events: auto; /* Allow mouse events */
+  pointer-events: none; /* Interaction is grid/cursor driven, not native hit-testing */
 }
 
 .link-wrapper-github {
   position: absolute;
-  left: 10vw;  /* spans columns 1, 2, 3 */
-  width: 30vw;
+  left: 10%;  /* spans columns 1, 2, 3 */
+  width: 30%;
   height: 100%;
   display: flex;
   align-items: center;
@@ -162,8 +178,8 @@ html, body {
 
 .link-wrapper-makerworld {
   position: absolute;
-  left: 60vw;  /* spans columns 6, 7, 8 */
-  width: 30vw;
+  left: 60%;  /* spans columns 6, 7, 8 */
+  width: 30%;
   height: 100%;
   display: flex;
   align-items: center;
@@ -178,11 +194,12 @@ html, body {
   padding: 0.5rem 1rem;
   transition: opacity 0.15s ease;
   box-sizing: border-box;
-  pointer-events: auto !important; /* Ensure click/hover detection */
-  cursor: pointer !important; /* Force pointer cursor */
+  /* The grid-driven window click handler opens links; disabling native pointer
+     events prevents a double-open and keeps the hit area aligned to the grid. */
+  pointer-events: none;
 }
 
-/* Blinking terminal frequency for hovered links */
+/* Blinking for hovered links — paced like a typing cursor (~1s period) */
 @keyframes link-blink {
   0%, 49% {
     opacity: 1;
@@ -193,97 +210,7 @@ html, body {
 }
 
 .blink-active {
-  animation: link-blink 0.3s steps(2, start) infinite;
-}
-
-/* --- MOBILE PORTRAIT OVERLAY --- */
-#portrait-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #000000;
-  z-index: 10000;
-  display: none; /* Shown dynamically in CSS media query */
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  box-sizing: border-box;
-}
-
-/* Trigger overlay when screen is portrait */
-@media (orientation: portrait) {
-  #portrait-overlay {
-    display: flex;
-  }
-}
-
-.warning-box {
-  border: 2px solid #ffffff;
-  padding: 2.5rem;
-  max-width: 480px;
-  background-color: #000000;
-  text-align: center;
-  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
-}
-
-.warning-box p {
-  margin: 0 0 1rem 0;
-}
-
-.warning-box .blink {
-  font-size: 1.1rem;
-  font-weight: 900;
-  color: #ffffff;
-  animation: bios-blink 1s steps(2, start) infinite;
-}
-
-.warning-box .desc {
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: #a0a0a0;
-  margin-bottom: 2rem;
-}
-
-@keyframes bios-blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0.3; }
-}
-
-.rotate-icon {
-  width: 50px;
-  height: 80px;
-  border: 3px solid #ffffff;
-  border-radius: 6px;
-  margin: 0 auto;
-  position: relative;
-  animation: rotate-device 2.5s ease-in-out infinite;
-}
-
-.rotate-icon::after {
-  content: '';
-  position: absolute;
-  bottom: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #ffffff;
-}
-
-@keyframes rotate-device {
-  0% {
-    transform: rotate(0deg);
-  }
-  30%, 70% {
-    transform: rotate(90deg);
-  }
-  100% {
-    transform: rotate(90deg);
-  }
+  animation: link-blink 1.06s steps(2, start) infinite;
 }
 
 /* Accessibility Offscreen Utility */
