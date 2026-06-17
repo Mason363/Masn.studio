@@ -244,14 +244,12 @@ function setupKeyboardNavigation() {
         }
       }
 
-      // Space / Enter press-down: depress the targeted letter
+      // Space / Enter press-down: depress the targeted letter (whatever cell it owns)
       if (e.key === ' ' || e.key === 'Enter') {
-        if (kbdRow === 2) { // Letter row
-          const letterIndex = letterIndexForCol(kbdCol);
-          if (letterIndex >= 0 && letterIndex < letterGroups.length) {
-            pressedMesh = letterGroups[letterIndex];
-            pressedMesh.depressZ = -1.5;
-          }
+        const letter = letterAtCell(kbdCol, kbdRow);
+        if (letter) {
+          pressedMesh = letter;
+          pressedMesh.depressZ = -1.5;
         }
       }
 
@@ -345,114 +343,38 @@ function updateCursorPosition() {
     return;
   }
 
-  // 3. LETTERS — projected bounding-box hit test (fits the live animation).
-  if (camera && letterGroups.length) {
-    if (useKeyboardCursor) {
-      const li = (row === 2) ? letterIndexForCol(col) : -1;
-      if (li >= 0 && li < letterGroups.length) {
-        hovered3DLetterGroup = letterGroups[li];
-        const r = getProjectedRect(hovered3DLetterGroup);
-        clearLinkBlinks();
-        setCursorRect(r.left, r.top, r.width, r.height);
-        return;
-      }
-    } else {
-      for (let i = 0; i < letterGroups.length; i++) {
-        const r = getProjectedRect(letterGroups[i]);
-        if (within(r, px, py)) {
-          hovered3DLetterGroup = letterGroups[i];
-          clearLinkBlinks();
-          setCursorRect(r.left, r.top, r.width, r.height);
-          return;
-        }
-      }
-    }
+  // 3. LETTERS — each MASON CHEN glyph OWNS the grid cells it occupies, so the
+  // background grid never fights the cursor in those cells. The cursor snaps to
+  // the letter's box (grid-cell sized at rest, growing to fit any animation).
+  const letter = letterAtCell(col, row);
+  if (letter) {
+    hovered3DLetterGroup = letter;
+    clearLinkBlinks();
+    // Always snap to the letter's fixed home grid cell — never the animated box —
+    // so changing a letter's style can't make the cursor drift to a neighbouring cell.
+    setCursorRect(letter.homeCol * colWidth, letter.homeRow * rowHeight, colWidth, rowHeight);
+    return;
   }
 
-  // 4. Fallback: strict grid cell.
+  // 4. Fallback: strict grid cell (empty space only).
   hovered3DLetterGroup = null;
   clearLinkBlinks();
   setCursorRect(col * colWidth, row * rowHeight, colWidth, rowHeight);
 }
 
-// Project a 3D letter group's active representation into content-space pixels.
-// (The renderer draws into the rotated container, so projected pixels are already
-// in content space and need no extra rotation handling.)
-function getProjectedRect(group) {
-  const width = viewW;
-  const height = viewH;
-
-  // Always project the real geometry of the active representation so the cursor and
-  // hit area track exactly where the glyph is actually drawn — in every state,
-  // including the flat resting state.
-  let activeMesh = group.getObjectByName('meshText');
-  if (group.state === 1) activeMesh = group.getObjectByName('meshText3D');
-  else if (group.state === 2) activeMesh = group.getObjectByName('groupCAD');
-  else if (group.state === 3) activeMesh = group.getObjectByName('groupClaude');
-  else if (group.state === 4) activeMesh = group.getObjectByName('groupAntigravity');
-  else if (group.state === 5) activeMesh = group.getObjectByName('groupDesign');
-  else if (group.state === 6) activeMesh = group.getObjectByName('groupSignature');
-  else if (group.state === 7) activeMesh = group.getObjectByName('groupGlitch');
-  if (!activeMesh) activeMesh = group;
-
-  const worldPoints = [];
-  activeMesh.updateMatrixWorld(true);
-  activeMesh.traverse(child => {
-    if ((child.isMesh || child.isLine || child.isLineSegments) && child.geometry) {
-      const geom = child.geometry;
-      if (!geom.boundingBox) geom.computeBoundingBox();
-      const min = geom.boundingBox.min;
-      const max = geom.boundingBox.max;
-      const corners = [
-        new THREE.Vector3(min.x, min.y, min.z), new THREE.Vector3(min.x, min.y, max.z),
-        new THREE.Vector3(min.x, max.y, min.z), new THREE.Vector3(min.x, max.y, max.z),
-        new THREE.Vector3(max.x, min.y, min.z), new THREE.Vector3(max.x, min.y, max.z),
-        new THREE.Vector3(max.x, max.y, min.z), new THREE.Vector3(max.x, max.y, max.z)
-      ];
-      corners.forEach(pt => { pt.applyMatrix4(child.matrixWorld); worldPoints.push(pt); });
-    }
-  });
-
-  if (worldPoints.length === 0) {
-    const box = new THREE.Box3().setFromObject(activeMesh);
-    worldPoints.push(box.min.clone(), box.max.clone());
+// Which letter (if any) owns a given grid cell. Each glyph owns exactly one stable
+// "home" cell (cached in resizeThreeJS), so the cell a MASON CHEN character inhabits
+// always snaps to that character and never shifts with the animation.
+function letterAtCell(col, row) {
+  if (!letterGroups.length) return null;
+  for (let i = 0; i < letterGroups.length; i++) {
+    const g = letterGroups[i];
+    if (g.homeCol === col && g.homeRow === row) return g;
   }
-
-  let minX = width, maxX = 0, minY = height, maxY = 0;
-  worldPoints.forEach(pt => {
-    pt.project(camera);
-    const x = ((pt.x + 1) * width) / 2;
-    const y = ((1 - pt.y) * height) / 2;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-  });
-
-  // Default flat text: the cursor is the size of the original grid cell, but
-  // centered on the letter itself — the letter dictates where it snaps, while
-  // its grid cell only dictates the size. This stops the grid cell and the glyph
-  // from fighting over the cursor.
-  if (group.state === 0) {
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    return {
-      left: cx - colWidth / 2,
-      top: cy - rowHeight / 2,
-      width: colWidth,
-      height: rowHeight
-    };
-  }
-
-  const padding = 6;
-  return {
-    left: Math.max(0, minX - padding),
-    top: Math.max(0, minY - padding),
-    width: Math.max(0, maxX - minX + padding * 2),
-    height: Math.max(0, maxY - minY + padding * 2)
-  };
+  return null;
 }
 
+// Project a 3D letter group's active representation into content-space pixels.
 // --- STAGE 1: THE COMMAND SEQUENCE ---
 function startStage1() {
   typewriterContainer.dataset.started = "true";
@@ -652,7 +574,8 @@ function createClaudeGroup(char) {
       diagMesh.name = 'block';
       diagMesh.targetScaleZ = 0.05;
       diagMesh.scale.set(1, 1, 0.05);
-      diagMesh.rotation.z = -0.55;
+      // Diagonal runs top-left -> bottom-right (a proper N, not a mirrored "И").
+      diagMesh.rotation.z = 0.55;
       group.add(diagMesh);
       
       const edges = new THREE.EdgesGeometry(diagGeom);
@@ -708,10 +631,10 @@ function createAntigravityGroup(char) {
 
   switch (char) {
     case 'M':
-      addStroke(-1.3, 0, 0, 0, 0, 0, 4.0);
-      addStroke(1.3, 0, 0, 0, 0, 0, 4.0);
-      addStroke(-0.65, 1.0, 0, 0, 0, -1.0, 2.4);
-      addStroke(0.65, 1.0, 0, 0, 0, 1.0, 2.4);
+      addStroke(-1.3, 0, 0, 0, 0, 0, 4.0);          // left vertical
+      addStroke(1.3, 0, 0, 0, 0, 0, 4.0);           // right vertical
+      addStroke(-0.65, 0.5, 0, 0, 0, 0.54, 2.6);    // inner "\" from top-left to center
+      addStroke(0.65, 0.5, 0, 0, 0, -0.54, 2.6);    // inner "/" from top-right to center
       break;
     case 'A':
       addStroke(-0.6, 0, 0, 0, 0, -0.25, 4.2);
@@ -732,9 +655,9 @@ function createAntigravityGroup(char) {
       addStroke(0, -1.7, 0, 0, 0, Math.PI / 2, 1.8);
       break;
     case 'N':
-      addStroke(-1.2, 0, 0, 0, 0, 0, 4.0);
-      addStroke(1.2, 0, 0, 0, 0, 0, 4.0);
-      addStroke(0, 0, 0, 0, 0, 1.03, 4.7);
+      addStroke(-1.2, 0, 0, 0, 0, 0, 4.0);          // left vertical
+      addStroke(1.2, 0, 0, 0, 0, 0, 4.0);           // right vertical
+      addStroke(0, 0, 0, 0, 0, 0.54, 4.66);         // diagonal top-left -> bottom-right
       break;
     case 'C':
       addStroke(-0.9, 0, 0, 0, 0, 0, 3.4);
@@ -1348,6 +1271,15 @@ function resizeThreeJS() {
     // Center inside the grid column
     const targetX = -visibleW / 2 + (charCol + 0.5) * colWidth3D;
     group.position.set(targetX, target3DY, 0);
+
+    // Cache the stable "home" grid cell for this letter. The cursor always snaps
+    // here regardless of the current animation, so it can never drift into the
+    // grid cell above/below the character. Column is exact; row is projected from
+    // the resting position (z = 0, before any depress/tilt is applied).
+    group.homeCol = charCol;
+    const proj = group.position.clone().project(camera);
+    const homeScreenY = ((1 - proj.y) / 2) * viewH;
+    group.homeRow = Math.max(0, Math.min(numRows - 1, Math.floor(homeScreenY / rowHeight)));
 
     // Scale characters to fit rectangular grid cells perfectly
     const maxColWidth3D = colWidth3D * 0.82;
