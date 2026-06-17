@@ -1,87 +1,99 @@
-# Mason Chen | Interactive Terminal Portfolio
+# Mason Chen — Interactive Terminal Portfolio
 
-A experimental portfolio landing page built as an immersive terminal-inspired experience.
+A single-page portfolio reimagined as a retro-futuristic terminal. It boots like a
+console, types out a `whoami`, then drops you into an interactive 3D scene where the
+name **MASON CHEN** is rendered as tactile letters you can click to morph through
+eight distinct visual styles — all navigated with a custom, grid-snapping block cursor.
 
-The site uses a retro-futuristic interface, custom cursor snapping, animated stage transitions, and an interactive 3D text scene to showcase a designer/developer aesthetic with dynamic visual states.
+🔗 **Live:** [masn.studio](https://masn.studio) · [GitHub](https://github.com/Mason363) · [MakerWorld](https://makerworld.com/en/@roboting)
 
-## 🚀 What it does
+---
 
-- Displays a command-line inspired splash screen with a typewriter effect for the `whoami` prompt.
-- Transitions into a full-screen interactive stage after a snappy scroll animation.
-- Renders `MASON CHEN` as a row of 3D letters using Three.js.
-- Supports hover and click interactions on letters to cycle between multiple visual states.
-- Includes two external link targets: GitHub and MakerWorld.
-- Forces landscape orientation on mobile and shows a warning overlay in portrait mode.
+## Highlights
 
-## ✨ Visual effects
+- **Boot sequence** — a command-line splash types `% whoami` character by character,
+  then "scrolls" into the main stage in discrete, mechanical increments.
+- **Interactive 3D type** — `MASON CHEN` is built procedurally with Three.js. Click
+  (or arrow-key + `Space`/`Enter`) any letter to cycle it through 8 styles.
+- **Custom block cursor** — the native pointer is hidden and replaced by a cursor that
+  snaps to a strict 10×7 grid, locking onto letters and links as you move.
+- **CRT atmosphere** — a full-screen canvas layers animated film grain and static for a
+  vintage-monitor feel.
+- **Forced landscape** — on portrait devices the whole UI rotates to render in landscape,
+  with pointer coordinates transformed to match.
 
-### Background
-- Full-screen canvas with CRT-like grain and static noise.
-- Subtle animated flicker for a vintage terminal atmosphere.
+## The eight letter states
 
-### Cursor
-- Completely custom cursor overlay replaces the native pointer.
-- Cursor snaps to a strict 10x7 grid for a mechanical, terminal-like feel.
-- Hovering over interactive elements causes the cursor to lock onto the target and trigger a blink state.
+Each letter animates between these representations, in order:
 
-### Stage transition
-- Typewriter animation reveals `whoami` character by character.
-- After typing completes, the page scrolls in five discrete viewport increments into the second stage.
-- Stage 2 hides the initial terminal command and initializes the 3D scene.
+| # | Style | Look |
+|---|-------|------|
+| 0 | Flat type | Clean white 2D glyph (default) |
+| 1 | Extruded 3D | Shaded, tilted, beveled relief |
+| 2 | CAD blueprint | Cyan wireframe that traces itself in |
+| 3 | Voxel blocks | Terracotta-orange blocks that extrude out |
+| 4 | Neon ASCII | Glowing green cylinder strokes |
+| 5 | Chromatic print | CMY layers offset like misregistered ink |
+| 6 | Signature | Golden cursive tube that "writes" itself |
+| 7 | Glitch | White slices that flicker and slide apart |
 
-### 3D letter states
-Each letter in `MASON CHEN` can be clicked or activated with keyboard controls to cycle through 8 visual states:
+## Controls
 
-1. Flat white 2D text
-2. Extruded 3D text with shading and tilt
-3. Cyan CAD-style blueprint wireframe
-4. Orange voxel block structure
-5. Neon green ANSI-style cylinder strokes
-6. CMY design overlay with chromatic offsets
-7. Golden cursive signature tubing
-8. Glitchy horizontal slice animation
+| Action | Result |
+|--------|--------|
+| Move mouse | Drive the snapping block cursor |
+| Click a letter | Cycle that letter to its next style |
+| Arrow keys | Move the cursor cell by cell across the grid |
+| `Space` / `Enter` | Activate the focused letter (same as a click) |
+| Click `GITHUB` / `MAKERWORLD` | Open the respective profile |
 
-## 🧠 Interaction
+## Tech stack
 
-- Mouse movement controls the custom snapping cursor.
-- Clicking a letter cycles it through the available visual states.
-- Keyboard arrow keys move the cursor through the same 10x7 snap grid.
-- `Space` or `Enter` on a letter triggers the same state-cycle action.
-- Clicking in the link zones opens external profiles:
-  - `GITHUB` opens `https://github.com/Mason363`
-  - `MAKERWORLD` opens `https://makerworld.com/en/@roboting`
+- **[Vite](https://vitejs.dev/)** — dev server and build tooling
+- **[Three.js](https://threejs.org/)** — WebGL rendering, `TextGeometry`, `FontLoader`
+- Vanilla **HTML / CSS / ES modules** — no UI framework
+- A second 2D `<canvas>` for the CRT grain layer
 
-## 🛠️ Tech stack
-
-- HTML5
-- CSS3
-- JavaScript (ES Modules)
-- Three.js for 3D rendering
-- `three/examples/jsm/loaders/FontLoader.js`
-- `three/examples/jsm/geometries/TextGeometry.js`
-
-## 📁 Project structure
-
-- `index.html` — main landing page structure
-- `src/style.css` — visual styling, layout, and overlay behavior
-- `src/main.js` — animation logic, input handling, Three.js scene setup
-- `public/fonts/helvetiker_bold.typeface.json` — font asset for 3D text rendering
-
-## 💡 Notes
-
-- Designed for a modern desktop/laptop viewport and landscape mobile orientation.
-- Pointer events are handled in a custom way to preserve the terminal-style cursor experience.
-- The 3D scene is built from procedural groups and animations rather than relying on pre-made models.
-
-## 📌 How to run
+## Getting started
 
 ```bash
-npx run dev
+# install dependencies
+npm install
+
+# start the dev server (http://localhost:5173)
+npm run dev
+
+# build for production into dist/
+npm run build
+
+# preview the production build locally
+npm run preview
 ```
 
-Then open `http://localhost:300`. (or whatever port you hosted it on)
+> Best experienced on a desktop/laptop or a phone in landscape.
 
-## 🔗 Links
+## Project structure
 
-- GitHub: https://github.com/Mason363
-- MakerWorld: https://makerworld.com/en/@roboting
+```
+.
+├── index.html                       # Page shell and stage markup
+├── src/
+│   ├── main.js                      # Stage flow, input handling, Three.js scene & states
+│   └── style.css                    # Layout, CRT canvas, cursor, rotation handling
+├── public/
+│   ├── favicon.png                  # Rounded MC icon
+│   └── fonts/
+│       └── helvetiker_bold.typeface.json   # Font used to extrude the 3D letters
+└── package.json
+```
+
+## Notes
+
+- The 3D letters are generated entirely from procedural geometry and animation — there
+  are no pre-made models.
+- Hit-testing is grid-based: each letter "owns" a stable home cell so the cursor and
+  click targets stay locked to it regardless of which style is animating.
+
+## License
+
+Personal project — all rights reserved. Feel free to explore the code for reference.

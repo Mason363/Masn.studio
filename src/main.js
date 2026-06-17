@@ -27,6 +27,7 @@ let kbdCol = 0;
 let kbdRow = 0;
 
 // Elements
+const rotationRoot = document.getElementById('rotation-root');
 const bgCanvas = document.getElementById('bg-canvas');
 const bgCtx = bgCanvas.getContext('2d');
 const terminalCursor = document.getElementById('terminal-cursor');
@@ -48,12 +49,42 @@ let hovered3DLetterGroup = null;
 let noiseCanvas, noiseCtx;
 
 // --- INITIALIZATION ---
+const INTRO_SEEN_KEY = 'mc_intro_seen';
+
+function hasSeenIntro() {
+  try { return localStorage.getItem(INTRO_SEEN_KEY) === '1'; }
+  catch (e) { return false; }
+}
+
+function markIntroSeen() {
+  try { localStorage.setItem(INTRO_SEEN_KEY, '1'); }
+  catch (e) { /* private mode / storage disabled — just replay the intro */ }
+}
+
 function init() {
   setupViewport();
   setupBgCanvas();
   setupCursorSnapping();
   setupKeyboardNavigation();
-  startStage1();
+
+  // The boot/typewriter intro only plays the first time a given visitor arrives.
+  // Returning visitors jump straight into the interactive stage.
+  if (hasSeenIntro()) {
+    skipIntro();
+  } else {
+    markIntroSeen();
+    startStage1();
+  }
+}
+
+// Jump directly to Stage 2 without the typewriter + scroll transition.
+function skipIntro() {
+  isStageTransitioned = true;
+  stage1.style.display = 'none';
+  scrollWrapper.style.transform = 'translateY(0)';
+  scrollWrapper.style.height = `${viewH}px`;
+  terminalCursor.style.display = 'block';
+  initThreeJSScene();
 }
 
 // --- VIEWPORT & FORCED LANDSCAPE ---
@@ -64,6 +95,16 @@ function applyViewport() {
   viewH = forceRotate ? window.innerWidth : window.innerHeight;
 
   document.body.classList.toggle('force-rotate', forceRotate);
+
+  // Size the rotation root in EXACT pixels (not vw/vh). On mobile, vh/vw refer to
+  // the full screen behind the browser chrome, while window.innerWidth/innerHeight
+  // (and the WebGL canvas + all pointer math) use the visible area. Sizing here in
+  // px keeps the container, the canvas, and the coordinate transforms perfectly
+  // aligned — fixing both the portrait framing and the tap-offset bug.
+  if (rotationRoot) {
+    rotationRoot.style.width = `${viewW}px`;
+    rotationRoot.style.height = `${viewH}px`;
+  }
 
   colWidth = viewW / numCols;
   rowHeight = viewH / numRows;
