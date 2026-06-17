@@ -4,14 +4,20 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 
 // --- GLOBAL VARIABLES & STATE ---
-let isMobilePortrait = false;
 let isStageTransitioned = false;
+
+// Forced-landscape viewport state. When the device is physically portrait we
+// rotate the entire UI 90deg so it always renders in landscape. viewW/viewH are
+// the *content* dimensions (already accounting for the rotation).
+let forceRotate = false;
+let viewW = window.innerWidth;
+let viewH = window.innerHeight;
 
 // Custom Snapping Grid Configuration (Strict 10x7 Grid)
 const numCols = 10;
 const numRows = 7;
-let colWidth = window.innerWidth / 10;
-let rowHeight = window.innerHeight / 7;
+let colWidth = viewW / numCols;
+let rowHeight = viewH / numRows;
 let mouseX = 0;
 let mouseY = 0;
 
@@ -44,42 +50,94 @@ let noiseCanvas, noiseCtx;
 
 // --- INITIALIZATION ---
 function init() {
-  setupOrientationCheck();
+  setupViewport();
   setupBgCanvas();
   setupCursorSnapping();
   setupKeyboardNavigation();
-  
-  if (!isMobilePortrait) {
-    startStage1();
-  }
+  startStage1();
 }
 
-// --- MOBILE PORTRAIT DETECTION ---
-function setupOrientationCheck() {
-  const checkOrientation = () => {
-    const portrait = window.innerHeight > window.innerWidth;
-    if (portrait !== isMobilePortrait) {
-      isMobilePortrait = portrait;
-      if (isMobilePortrait) {
-        portraitOverlay.style.display = 'flex';
-      } else {
-        portraitOverlay.style.display = 'none';
-        if (!typewriterContainer.dataset.started) {
-          startStage1();
-        }
-      }
-    }
-    
-    // Resize dimensions
-    resizeBgCanvas();
-    if (renderer) {
-      resizeThreeJS();
-    }
-    resizeStage1Text();
-  };
+// --- VIEWPORT & FORCED LANDSCAPE ---
+function applyViewport() {
+  // Force landscape: if the device is physically portrait, rotate the whole UI.
+  forceRotate = window.innerHeight > window.innerWidth;
+  viewW = forceRotate ? window.innerHeight : window.innerWidth;
+  viewH = forceRotate ? window.innerWidth : window.innerHeight;
 
-  window.addEventListener('resize', checkOrientation);
-  checkOrientation();
+  document.body.classList.toggle('force-rotate', forceRotate);
+
+  colWidth = viewW / numCols;
+  rowHeight = viewH / numRows;
+
+  // Size the staged content explicitly in pixels so layout never depends on
+  // vw/vh units (which would reference the unrotated screen under rotation).
+  if (scrollWrapper) {
+    scrollWrapper.style.width = `${viewW}px`;
+    scrollWrapper.style.height = `${isStageTransitioned ? viewH : viewH * 2}px`;
+  }
+  document.querySelectorAll('.stage').forEach(s => {
+    s.style.width = `${viewW}px`;
+    s.style.height = `${viewH}px`;
+  });
+
+  resizeBgCanvas();
+  if (renderer) resizeThreeJS();
+  resizeStage1Text();
+  updateCursorPosition();
+}
+
+function setupViewport() {
+  window.addEventListener('resize', applyViewport);
+  window.addEventListener('orientationchange', applyViewport);
+  applyViewport();
+}
+
+// Convert raw pointer (screen) coordinates into rotated content-space coordinates.
+function toContentX(clientX, clientY) { return forceRotate ? clientY : clientX; }
+function toContentY(clientX, clientY) { return forceRotate ? (window.innerWidth - clientX) : clientY; }
+
+// Convert a getBoundingClientRect() (screen space) into content-space.
+function toContentRect(r) {
+  if (!forceRotate) return { left: r.left, top: r.top, width: r.width, height: r.height };
+  const SW = window.innerWidth;
+  return { left: r.top, top: SW - r.right, width: r.height, height: r.width };
+}
+
+// --- GRID HELPERS (single source of truth for the strict 10x7 grid) ---
+function letterIndexForCol(col) {
+  if (col >= 0 && col < 5) return col;       // M A S O N -> columns 0-4
+  if (col > 5 && col < 10) return col - 1;   // C H E N   -> columns 6-9 (col 5 is the space)
+  return -1;
+}
+
+function linkForCell(col, row) {
+  if (row === 5 || row === 6) {
+    if (col >= 1 && col <= 3) return 'github';
+    if (col >= 6 && col <= 8) return 'makerworld';
+  }
+  return null;
+}
+
+function setCursorRect(left, top, width, height) {
+  terminalCursor.style.left = `${left}px`;
+  terminalCursor.style.top = `${top}px`;
+  terminalCursor.style.width = `${width}px`;
+  terminalCursor.style.height = `${height}px`;
+}
+
+// The grid cell currently targeted by either the mouse or the keyboard cursor.
+function activeCell() {
+  let col, row;
+  if (useKeyboardCursor) {
+    col = kbdCol;
+    row = kbdRow;
+  } else {
+    col = Math.floor(mouseX / colWidth);
+    row = Math.floor(mouseY / rowHeight);
+  }
+  col = Math.max(0, Math.min(numCols - 1, col));
+  row = Math.max(0, Math.min(numRows - 1, row));
+  return { col, row };
 }
 
 // --- BACKGROUND CANVAS (CRT GRAIN STATIC) ---
@@ -104,8 +162,8 @@ function setupBgCanvas() {
 }
 
 function resizeBgCanvas() {
-  bgCanvas.width = window.innerWidth;
-  bgCanvas.height = window.innerHeight;
+  bgCanvas.width = viewW;
+  bgCanvas.height = viewH;
 }
 
 function bgRenderLoop() {
@@ -126,9 +184,9 @@ function bgRenderLoop() {
 // --- CUSTOM CURSOR & MOUSE SNAPPING ---
 function setupCursorSnapping() {
   window.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
-    
+    mouseX = toContentX(e.clientX, e.clientY);
+    mouseY = toContentY(e.clientX, e.clientY);
+
     // Switch back to mouse cursor mode on mouse movement
     useKeyboardCursor = false;
     updateCursorPosition();
@@ -136,8 +194,8 @@ function setupCursorSnapping() {
 
   document.addEventListener('mouseover', (e) => {
     const target = e.target;
-    // Stage 1 interactive targets & Stage 2 link span character targets
-    if (target.classList.contains('char-span') || target.classList.contains('prompt-char') || target.classList.contains('space-char') || target.classList.contains('terminal-link')) {
+    // Stage 1 typed-character targets only (Stage 2 uses pure grid snapping)
+    if (target.classList.contains('char-span') || target.classList.contains('prompt-char') || target.classList.contains('space-char')) {
       hoveredHtmlElement = target;
       updateCursorPosition();
     }
@@ -187,13 +245,10 @@ function setupKeyboardNavigation() {
         }
       }
 
-      // Space / Enter click down actions
+      // Space / Enter press-down: depress the targeted letter
       if (e.key === ' ' || e.key === 'Enter') {
-        if (kbdRow === 2) { // Middle text row
-          let letterIndex = -1;
-          if (kbdCol >= 0 && kbdCol < 5) letterIndex = kbdCol;
-          else if (kbdCol > 5 && kbdCol < 10) letterIndex = kbdCol - 1;
-
+        if (kbdRow === 2) { // Letter row
+          const letterIndex = letterIndexForCol(kbdCol);
           if (letterIndex >= 0 && letterIndex < letterGroups.length) {
             pressedMesh = letterGroups[letterIndex];
             pressedMesh.depressZ = -1.5;
@@ -216,267 +271,70 @@ function setupKeyboardNavigation() {
         updateLetterRepresentations(pressedMesh);
         pressedMesh = null;
         updateCursorPosition();
-      } else if (kbdRow === 5 || kbdRow === 6) { // Links row
-        if (kbdCol >= 1 && kbdCol <= 3) {
-          window.open('https://github.com/Mason363', '_blank');
-        } else if (kbdCol >= 6 && kbdCol <= 8) {
-          window.open('https://makerworld.com/en/@roboting', '_blank');
-        }
+      } else {
+        const link = linkForCell(kbdCol, kbdRow);
+        if (link === 'github') window.open('https://github.com/Mason363', '_blank');
+        else if (link === 'makerworld') window.open('https://makerworld.com/en/@roboting', '_blank');
       }
     }
   });
 }
 
 function updateCursorPosition() {
-  colWidth = window.innerWidth / 10;
-  rowHeight = window.innerHeight / 7;
+  colWidth = viewW / numCols;
+  rowHeight = viewH / numRows;
 
   // --- STAGE 1 SNAPPING ---
   if (!isStageTransitioned) {
     if (hoveredHtmlElement) {
-      const rect = hoveredHtmlElement.getBoundingClientRect();
-      terminalCursor.style.left = `${rect.left}px`;
-      terminalCursor.style.top = `${rect.top}px`;
-      terminalCursor.style.width = `${rect.width}px`;
-      terminalCursor.style.height = `${rect.height}px`;
+      const rect = toContentRect(hoveredHtmlElement.getBoundingClientRect());
+      setCursorRect(rect.left, rect.top, rect.width, rect.height);
       return;
     }
-    
-    // Stage 1 Grid Snap
-    const fs = parseFloat(document.querySelector('.command-line').style.fontSize || "80");
+
+    // Stage 1 grid snap (sized to the typed glyph cell)
+    const cmdLine = document.querySelector('.command-line');
+    const fs = parseFloat((cmdLine && cmdLine.style.fontSize) || "80");
     const cellH = fs * 0.95;
     const cellW = fs * 0.53;
-    const cmdLine = document.querySelector('.command-line');
-    const rect = cmdLine ? cmdLine.getBoundingClientRect() : { left: 0, top: 0 };
+    const rect = cmdLine ? toContentRect(cmdLine.getBoundingClientRect()) : { left: 0, top: 0 };
     const gridX = rect.left % cellW;
     const gridY = rect.top % cellH;
 
     const cellX = Math.floor((mouseX - gridX) / cellW);
     const cellY = Math.floor((mouseY - gridY) / cellH);
-    
-    terminalCursor.style.left = `${cellX * cellW + gridX}px`;
-    terminalCursor.style.top = `${cellY * cellH + gridY}px`;
-    terminalCursor.style.width = `${cellW}px`;
-    terminalCursor.style.height = `${cellH}px`;
+
+    setCursorRect(cellX * cellW + gridX, cellY * cellH + gridY, cellW, cellH);
     return;
   }
 
-  // --- STAGE 2 SNAP SYSTEM ---
+  // --- STAGE 2: STRICT GRID SNAP SYSTEM ---
+  // Everything (letters, links, empty space) snaps to exactly one 10x7 grid cell.
+  // The cell the cursor sits in is the single source of truth for hover & clicks,
+  // so the visual cursor and the hit target can never disagree.
+  const { col, row } = activeCell();
+
+  // Resolve hovered letter (only the letter row, one column per letter)
+  hovered3DLetterGroup = null;
+  if (row === 2) {
+    const letterIndex = letterIndexForCol(col);
+    if (letterIndex >= 0 && letterIndex < letterGroups.length) {
+      hovered3DLetterGroup = letterGroups[letterIndex];
+    }
+  }
+
+  // Resolve hovered link & drive the blink
   const githubLink = document.querySelector('.terminal-link[data-link="github"]');
   const makerworldLink = document.querySelector('.terminal-link[data-link="makerworld"]');
+  if (githubLink) githubLink.classList.remove('blink-active');
+  if (makerworldLink) makerworldLink.classList.remove('blink-active');
 
-  // Helper to clear link blinks
-  const clearLinkBlinks = () => {
-    if (githubLink) githubLink.classList.remove('blink-active');
-    if (makerworldLink) makerworldLink.classList.remove('blink-active');
-  };
+  const link = linkForCell(col, row);
+  if (link === 'github' && githubLink) githubLink.classList.add('blink-active');
+  else if (link === 'makerworld' && makerworldLink) makerworldLink.classList.add('blink-active');
 
-  // Keyboard navigation snap path
-  if (useKeyboardCursor) {
-    if (kbdRow === 5 || kbdRow === 6) { // Links line Row
-      if (kbdCol >= 1 && kbdCol <= 3) { // github spans columns 1-3
-        const rect = githubLink.getBoundingClientRect();
-        terminalCursor.style.left = `${rect.left}px`;
-        terminalCursor.style.top = `${rect.top}px`;
-        terminalCursor.style.width = `${rect.width}px`;
-        terminalCursor.style.height = `${rect.height}px`;
-        
-        githubLink.classList.add('blink-active');
-        if (makerworldLink) makerworldLink.classList.remove('blink-active');
-        return;
-      } else if (kbdCol >= 6 && kbdCol <= 8) { // makerworld spans columns 6-8
-        const rect = makerworldLink.getBoundingClientRect();
-        terminalCursor.style.left = `${rect.left}px`;
-        terminalCursor.style.top = `${rect.top}px`;
-        terminalCursor.style.width = `${rect.width}px`;
-        terminalCursor.style.height = `${rect.height}px`;
-        
-        makerworldLink.classList.add('blink-active');
-        if (githubLink) githubLink.classList.remove('blink-active');
-        return;
-      }
-    }
-    
-    if (kbdRow === 2) { // Character Row
-      let letterIndex = -1;
-      if (kbdCol >= 0 && kbdCol < 5) letterIndex = kbdCol;
-      else if (kbdCol > 5 && kbdCol < 10) letterIndex = kbdCol - 1;
-      
-      if (letterIndex >= 0 && letterIndex < letterGroups.length) {
-        hovered3DLetterGroup = letterGroups[letterIndex];
-        const rect = getProjectedRect(hovered3DLetterGroup, camera, window.innerWidth, window.innerHeight);
-        
-        terminalCursor.style.left = `${rect.left}px`;
-        terminalCursor.style.top = `${rect.top}px`;
-        terminalCursor.style.width = `${rect.width}px`;
-        terminalCursor.style.height = `${rect.height}px`;
-        return;
-      }
-    }
-
-    // Default keyboard empty cell snap
-    clearLinkBlinks();
-    hovered3DLetterGroup = null;
-    terminalCursor.style.left = `${kbdCol * colWidth}px`;
-    terminalCursor.style.top = `${kbdRow * rowHeight}px`;
-    terminalCursor.style.width = `${colWidth}px`;
-    terminalCursor.style.height = `${rowHeight}px`;
-    return;
-  }
-
-  // Mouse navigation snap path
-  const githubRect = githubLink ? githubLink.getBoundingClientRect() : null;
-  const makerworldRect = makerworldLink ? makerworldLink.getBoundingClientRect() : null;
-
-  const col = Math.floor(mouseX / colWidth);
-  const row = Math.floor(mouseY / rowHeight);
-
-  // 1. Check GITHUB Bounding Box Snap or Grid Segment Snap (Row 5 or 6, Columns 1-3)
-  const isOverGithubGrid = ((row === 5 || row === 6) && col >= 1 && col <= 3);
-  const isOverGithubRect = (githubRect && mouseX >= githubRect.left && mouseX <= githubRect.right &&
-                            mouseY >= githubRect.top && mouseY <= githubRect.bottom);
-  if (githubRect && (isOverGithubGrid || isOverGithubRect)) {
-    terminalCursor.style.left = `${githubRect.left}px`;
-    terminalCursor.style.top = `${githubRect.top}px`;
-    terminalCursor.style.width = `${githubRect.width}px`;
-    terminalCursor.style.height = `${githubRect.height}px`;
-    if (githubLink) githubLink.classList.add('blink-active');
-    if (makerworldLink) makerworldLink.classList.remove('blink-active');
-    return;
-  }
-
-  // 2. Check MAKERWORLD Bounding Box Snap or Grid Segment Snap (Row 5 or 6, Columns 6-8)
-  const isOverMakerworldGrid = ((row === 5 || row === 6) && col >= 6 && col <= 8);
-  const isOverMakerworldRect = (makerworldRect && mouseX >= makerworldRect.left && mouseX <= makerworldRect.right &&
-                                mouseY >= makerworldRect.top && mouseY <= makerworldRect.bottom);
-  if (makerworldRect && (isOverMakerworldGrid || isOverMakerworldRect)) {
-    terminalCursor.style.left = `${makerworldRect.left}px`;
-    terminalCursor.style.top = `${makerworldRect.top}px`;
-    terminalCursor.style.width = `${makerworldRect.width}px`;
-    terminalCursor.style.height = `${makerworldRect.height}px`;
-    if (makerworldLink) makerworldLink.classList.add('blink-active');
-    if (githubLink) githubLink.classList.remove('blink-active');
-    return;
-  }
-
-  // 3. Check Letter Hit — test the projected bounding rect for each letter so that
-  //    states > 0 (tilted / extruded) that extend outside row 2 still register correctly.
-  let hitLetterGroup = null;
-  for (let li = 0; li < letterGroups.length; li++) {
-    const lg = letterGroups[li];
-    const rect = getProjectedRect(lg, camera, window.innerWidth, window.innerHeight);
-    if (mouseX >= rect.left && mouseX <= rect.left + rect.width &&
-        mouseY >= rect.top  && mouseY <= rect.top  + rect.height) {
-      hitLetterGroup = lg;
-      hovered3DLetterGroup = lg;
-      terminalCursor.style.left   = `${rect.left}px`;
-      terminalCursor.style.top    = `${rect.top}px`;
-      terminalCursor.style.width  = `${rect.width}px`;
-      terminalCursor.style.height = `${rect.height}px`;
-      clearLinkBlinks();
-      break;
-    }
-  }
-  if (!hitLetterGroup) hovered3DLetterGroup = null;
-  if (hitLetterGroup) return;
-
-  // 4. Fallback: Snap cursor to strict rectangular grid cell
-  clearLinkBlinks();
-  terminalCursor.style.left = `${col * colWidth}px`;
-  terminalCursor.style.top = `${row * rowHeight}px`;
-  terminalCursor.style.width = `${colWidth}px`;
-  terminalCursor.style.height = `${rowHeight}px`;
-}
-
-// Project a 3D Group bounding box onto 2D screen coordinates
-function getProjectedRect(group, camera, width, height) {
-  // Find the currently active mesh to measure
-  let activeMesh = group.getObjectByName('meshText');
-  if (group.state === 1) activeMesh = group.getObjectByName('meshText3D');
-  else if (group.state === 2) activeMesh = group.getObjectByName('groupCAD');
-  else if (group.state === 3) activeMesh = group.getObjectByName('groupClaude');
-  else if (group.state === 4) activeMesh = group.getObjectByName('groupAntigravity');
-  else if (group.state === 5) activeMesh = group.getObjectByName('groupDesign');
-  else if (group.state === 6) activeMesh = group.getObjectByName('groupSignature');
-  else if (group.state === 7) activeMesh = group.getObjectByName('groupGlitch');
-
-  if (!activeMesh) activeMesh = group;
-
-  // Collect all world-space points of the geometries to project
-  const worldPoints = [];
-  activeMesh.updateMatrixWorld(true);
-
-  activeMesh.traverse(child => {
-    if ((child.isMesh || child.isLine || child.isLineSegments) && child.geometry) {
-      const geom = child.geometry;
-      if (!geom.boundingBox) geom.computeBoundingBox();
-      const min = geom.boundingBox.min;
-      const max = geom.boundingBox.max;
-      
-      const localCorners = [
-        new THREE.Vector3(min.x, min.y, min.z),
-        new THREE.Vector3(min.x, min.y, max.z),
-        new THREE.Vector3(min.x, max.y, min.z),
-        new THREE.Vector3(min.x, max.y, max.z),
-        new THREE.Vector3(max.x, min.y, min.z),
-        new THREE.Vector3(max.x, min.y, max.z),
-        new THREE.Vector3(max.x, max.y, min.z),
-        new THREE.Vector3(max.x, max.y, max.z)
-      ];
-
-      localCorners.forEach(pt => {
-        pt.applyMatrix4(child.matrixWorld);
-        worldPoints.push(pt);
-      });
-    }
-  });
-
-  // Fallback if no children with geometry found
-  if (worldPoints.length === 0) {
-    const box = new THREE.Box3().setFromObject(activeMesh);
-    const min = box.min;
-    const max = box.max;
-    worldPoints.push(
-      new THREE.Vector3(min.x, min.y, min.z),
-      new THREE.Vector3(min.x, min.y, max.z),
-      new THREE.Vector3(min.x, max.y, min.z),
-      new THREE.Vector3(min.x, max.y, max.z),
-      new THREE.Vector3(max.x, min.y, min.z),
-      new THREE.Vector3(max.x, min.y, max.z),
-      new THREE.Vector3(max.x, max.y, min.z),
-      new THREE.Vector3(max.x, max.y, max.z)
-    );
-  }
-
-  let minX = width;
-  let maxX = 0;
-  let minY = height;
-  let maxY = 0;
-
-  worldPoints.forEach(pt => {
-    pt.project(camera);
-    const x = ((pt.x + 1) * width) / 2;
-    const y = ((1 - pt.y) * height) / 2;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-  });
-
-  const padding = 6;
-  const rectL = Math.max(0, minX - padding);
-  const rectT = Math.max(0, minY - padding);
-  const rectW = Math.max(0, maxX - minX + padding * 2);
-  const rectH = Math.max(0, maxY - minY + padding * 2);
-
-  // We do NOT clamp maximum width/height so that the cursor scales in size to fit the animations
-  // (taking area from neighboring grid cells as it gets bigger).
-  return {
-    left: rectL,
-    top: rectT,
-    width: rectW,
-    height: rectH
-  };
+  // Cursor always occupies the single grid cell under the pointer
+  setCursorRect(col * colWidth, row * rowHeight, colWidth, rowHeight);
 }
 
 // --- STAGE 1: THE COMMAND SEQUENCE ---
@@ -525,10 +383,10 @@ function resizeStage1Text() {
   const mWidth = tempMeasure.getBoundingClientRect().width;
   document.body.removeChild(tempMeasure);
 
-  const targetW = window.innerWidth * 0.88;
+  const targetW = viewW * 0.88;
   let dynamicFontSize = (targetW / mWidth) * 100;
 
-  const maxFontSize = window.innerHeight * 0.3;
+  const maxFontSize = viewH * 0.3;
   if (dynamicFontSize > maxFontSize) {
     dynamicFontSize = maxFontSize;
   }
@@ -543,7 +401,7 @@ function simulatedEnterKeypress() {
 
 // --- Snappy transition in bigger, even increments ---
 function startChoppyTransition() {
-  const viewportHeight = window.innerHeight;
+  const viewportHeight = viewH;
   let currentY = 0;
   const targetY = -viewportHeight;
   
@@ -563,7 +421,7 @@ function startChoppyTransition() {
       isStageTransitioned = true;
       stage1.style.display = 'none';
       scrollWrapper.style.transform = `translateY(0)`; // Reset translation
-      scrollWrapper.style.height = `100vh`;
+      scrollWrapper.style.height = `${viewH}px`;
       
       initThreeJSScene();
     }
@@ -574,8 +432,8 @@ function startChoppyTransition() {
 
 // --- STAGE 2: THREE.JS MULTI-STATE INTERACTIVE CORE ---
 function initThreeJSScene() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const width = viewW;
+  const height = viewH;
 
   scene = new THREE.Scene();
 
@@ -1338,15 +1196,15 @@ function updateLetterRepresentations(group) {
 function resizeThreeJS() {
   if (!camera || !renderer || letterGroups.length === 0) return;
 
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const width = viewW;
+  const height = viewH;
 
   renderer.setSize(width, height);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
 
-  colWidth = window.innerWidth / 10;
-  rowHeight = window.innerHeight / 7;
+  colWidth = viewW / numCols;
+  rowHeight = viewH / numRows;
 
   // Calculate 3D viewport dimensions at Z = 0
   const dist = camera.position.z;
@@ -1354,8 +1212,8 @@ function resizeThreeJS() {
   const visibleH = 2 * Math.tan(fovRad / 2) * dist;
   const visibleW = visibleH * camera.aspect;
 
-  const colWidth3D = visibleW / 10;
-  const rowHeight3D = visibleH / 7;
+  const colWidth3D = visibleW / numCols;
+  const rowHeight3D = visibleH / numRows;
 
   // Vertical center of Row 2: (2 + 0.5) * rowHeight = 2.5 * rowHeight
   const screenCenterY = 2.5 * rowHeight;
