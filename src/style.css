@@ -1,0 +1,300 @@
+/* Custom Style Sheet for Terminal Portfolio */
+
+/* Global Reset & Viewport Constraints */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden !important;
+  background-color: #000000;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Compact", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* Force hide cursor globally */
+* {
+  cursor: none !important;
+}
+
+/* Background Canvas Layer (Grain, Trails, Bloom) */
+#bg-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Custom Snapping Block Cursor */
+#terminal-cursor {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background-color: #ffffff;
+  mix-blend-mode: difference;
+  display: none; /* Shown dynamically in JS */
+  /* Snaps instantly, no transition properties */
+}
+
+/* App Viewport Container (Disallows scrolling) */
+#app-viewport {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Scroll Wrapper for transitions */
+#scroll-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 200vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Stage Layouts */
+.stage {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.stage-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* --- STAGE 1: THE COMMAND --- */
+#stage-1 {
+  justify-content: flex-start;
+}
+
+#stage-1 .stage-content {
+  align-items: flex-start;
+  justify-content: center;
+  padding-left: 6vw;
+  box-sizing: border-box;
+}
+
+.command-line {
+  margin: 0;
+  padding: 0;
+  font-weight: 900;
+  text-transform: lowercase;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.prompt-char {
+  color: #ffffff;
+  opacity: 0.8;
+}
+
+#typewriter-text {
+  display: flex;
+}
+
+.char-span {
+  display: inline-block;
+}
+
+/* --- STAGE 2: THE OUTPUT --- */
+#stage-2 {
+  justify-content: center;
+}
+
+#three-canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+/* Links Line placement */
+.links-line {
+  position: absolute;
+  bottom: 8vh;
+  left: 0;
+  width: 100vw;
+  height: 50px;
+  z-index: 100; /* High z-index to stay above canvas */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Compact", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  pointer-events: auto; /* Allow mouse events */
+}
+
+.link-wrapper-github {
+  position: absolute;
+  left: 10vw;  /* spans columns 1, 2, 3 */
+  width: 30vw;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.link-wrapper-makerworld {
+  position: absolute;
+  left: 60vw;  /* spans columns 6, 7, 8 */
+  width: 30vw;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terminal-link {
+  display: inline-block;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 1.25rem; /* Noticeably smaller, readable font size */
+  padding: 0.5rem 1rem;
+  transition: opacity 0.15s ease;
+  box-sizing: border-box;
+  pointer-events: auto !important; /* Ensure click/hover detection */
+  cursor: pointer !important; /* Force pointer cursor */
+}
+
+/* Blinking terminal frequency for hovered links */
+@keyframes link-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.15;
+  }
+}
+
+.blink-active {
+  animation: link-blink 0.3s steps(2, start) infinite;
+}
+
+/* --- MOBILE PORTRAIT OVERLAY --- */
+#portrait-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000000;
+  z-index: 10000;
+  display: none; /* Shown dynamically in CSS media query */
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+/* Trigger overlay when screen is portrait */
+@media (orientation: portrait) {
+  #portrait-overlay {
+    display: flex;
+  }
+}
+
+.warning-box {
+  border: 2px solid #ffffff;
+  padding: 2.5rem;
+  max-width: 480px;
+  background-color: #000000;
+  text-align: center;
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.warning-box p {
+  margin: 0 0 1rem 0;
+}
+
+.warning-box .blink {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #ffffff;
+  animation: bios-blink 1s steps(2, start) infinite;
+}
+
+.warning-box .desc {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #a0a0a0;
+  margin-bottom: 2rem;
+}
+
+@keyframes bios-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.3; }
+}
+
+.rotate-icon {
+  width: 50px;
+  height: 80px;
+  border: 3px solid #ffffff;
+  border-radius: 6px;
+  margin: 0 auto;
+  position: relative;
+  animation: rotate-device 2.5s ease-in-out infinite;
+}
+
+.rotate-icon::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ffffff;
+}
+
+@keyframes rotate-device {
+  0% {
+    transform: rotate(0deg);
+  }
+  30%, 70% {
+    transform: rotate(90deg);
+  }
+  100% {
+    transform: rotate(90deg);
+  }
+}
+
+/* Accessibility Offscreen Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
