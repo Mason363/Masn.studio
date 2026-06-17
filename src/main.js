@@ -1241,6 +1241,11 @@ function resizeThreeJS() {
   renderer.setSize(width, height);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  // Refresh the camera world/inverse matrices NOW. On the very first call (during
+  // buildThreeLetters, before the first render) these are otherwise stale, which
+  // made unproject/project below compute the wrong screen row — letters' cached
+  // home cells landed on the top row until a later resize warmed the camera.
+  camera.updateMatrixWorld(true);
 
   colWidth = viewW / numCols;
   rowHeight = viewH / numRows;
