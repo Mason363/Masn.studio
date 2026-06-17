@@ -2,6 +2,7 @@ import './style.css'
 import * as THREE from 'three'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
+import { inject } from '@vercel/analytics'
 
 // --- GLOBAL VARIABLES & STATE ---
 let isStageTransitioned = false;
@@ -1622,3 +1623,6 @@ function setupThreeEvents() {
 
 // --- RUN PROGRAM ---
 init();
+
+// Initialize Vercel Web Analytics
+inject();
