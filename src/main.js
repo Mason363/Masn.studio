@@ -25,6 +25,10 @@ let mouseY = 0;
 let useKeyboardCursor = false;
 let kbdCol = 0;
 let kbdRow = 0;
+// Selected entry in the vertical link stack (-1 = keyboard cursor is on the
+// plain grid). The stack has 6 entries in 4 grid rows, so inside it the cursor
+// steps per entry instead of per row.
+let kbdLink = -1;
 
 // Elements
 const rotationRoot = document.getElementById('rotation-root');
@@ -123,7 +127,15 @@ function applyViewport() {
   resizeBgCanvas();
   if (renderer) resizeThreeJS();
   resizeStage1Text();
+  resizeLinksList();
   updateCursorPosition();
+}
+
+// The terminal listing scales with the viewport: each of its 7 lines (prompt +
+// 6 links) is 1/7 of the lower stage, and the glyphs fill ~60% of that line.
+function resizeLinksList() {
+  const line = document.querySelector('.links-line');
+  if (line) line.style.fontSize = `${Math.max(13, Math.round(viewH * 0.048))}px`;
 }
 
 function setupViewport() {
@@ -150,26 +162,45 @@ function letterIndexForCol(col) {
   return -1;
 }
 
-// The terminal link listing: each entry owns a zone of grid cells (row + column
-// span) that matches its .link-wrapper placement in the CSS, so cursor snapping,
-// keyboard navigation, and clicks all resolve through this single table.
+// The terminal link listing (vertical stack). Order must match the DOM order of
+// the .link-wrapper entries in index.html; hover/click zones are resolved
+// geometrically from those entry rows, so cursor snapping, keyboard navigation,
+// and clicks all agree.
 const LINKS = [
-  { name: 'github',     url: 'https://github.com/Mason363',         row: 5, colMin: 0, colMax: 2 },
-  { name: 'makerworld', url: 'https://makerworld.com/en/@roboting', row: 5, colMin: 3, colMax: 6 },
-  { name: 'tactile',    url: 'https://tactile.masn.studio',         row: 5, colMin: 7, colMax: 9 },
-  { name: 'pathstitch', url: 'https://pathstitch.masn.studio',      row: 6, colMin: 0, colMax: 2 },
-  { name: 'contour',    url: 'https://contour.masn.studio',         row: 6, colMin: 3, colMax: 6 },
-  { name: 'planar',     url: 'https://planar.masn.studio',          row: 6, colMin: 7, colMax: 9 },
+  { name: 'github',     url: 'https://github.com/Mason363' },
+  { name: 'makerworld', url: 'https://makerworld.com/en/@roboting' },
+  { name: 'tactile',    url: 'https://tactile.masn.studio' },
+  { name: 'pathstitch', url: 'https://pathstitch.masn.studio' },
+  { name: 'contour',    url: 'https://contour.masn.studio' },
+  { name: 'planar',     url: 'https://planar.masn.studio' },
 ];
 
-function linkForCell(col, row) {
-  const hit = LINKS.find(l => row === l.row && col >= l.colMin && col <= l.colMax);
-  return hit ? hit.name : null;
+function openLinkAt(index) {
+  const link = LINKS[index];
+  if (link) window.open(link.url, '_blank');
 }
 
-function openLink(name) {
-  const link = LINKS.find(l => l.name === name);
-  if (link) window.open(link.url, '_blank');
+function linkWrapperRect(index) {
+  const w = document.querySelectorAll('.link-wrapper')[index];
+  return w ? toContentRect(w.getBoundingClientRect()) : null;
+}
+
+// Map a content-space point to an entry in the link stack. Every entry's zone
+// spans its full row, from the screen's left edge to the widest entry's right
+// edge — generous, like the old multi-cell grid zones.
+function linkIndexAtPoint(x, y) {
+  const wrappers = document.querySelectorAll('.link-wrapper');
+  if (!wrappers.length) return -1;
+  let top = Infinity, bottom = -Infinity, right = 0;
+  wrappers.forEach(w => {
+    const r = toContentRect(w.getBoundingClientRect());
+    top = Math.min(top, r.top);
+    bottom = Math.max(bottom, r.top + r.height);
+    right = Math.max(right, r.left + r.width);
+  });
+  if (x < 0 || x > right || y < top || y > bottom) return -1;
+  const idx = Math.floor((y - top) / ((bottom - top) / wrappers.length));
+  return Math.max(0, Math.min(wrappers.length - 1, idx));
 }
 
 function setCursorRect(left, top, width, height) {
@@ -283,10 +314,34 @@ function setupKeyboardNavigation() {
       e.preventDefault(); // Prevent standard page arrow scrolls
 
       if (!useKeyboardCursor) {
-        // Init kbd grid coordinate from mouse position
+        // Init kbd grid coordinate (and stack entry, if any) from mouse position
         kbdCol = Math.floor(mouseX / colWidth);
         kbdRow = Math.floor(mouseY / rowHeight);
+        kbdLink = linkIndexAtPoint(mouseX, mouseY);
         useKeyboardCursor = true;
+      } else if (kbdLink >= 0) {
+        // Inside the link stack the cursor steps per entry, not per grid row.
+        if (e.key === 'ArrowUp') {
+          if (kbdLink > 0) {
+            kbdLink--;
+          } else {
+            // Exit upward onto the grid row above the listing (the letters).
+            const r = linkWrapperRect(0);
+            if (r) kbdRow = Math.max(0, Math.floor(r.top / rowHeight) - 1);
+            kbdLink = -1;
+          }
+        } else if (e.key === 'ArrowDown') {
+          kbdLink = Math.min(LINKS.length - 1, kbdLink + 1);
+        } else if (e.key === 'ArrowRight') {
+          // Exit sideways onto the first grid cell right of the listing.
+          const r = linkWrapperRect(kbdLink);
+          if (r) {
+            kbdCol = Math.min(numCols - 1, Math.floor((r.left + r.width) / colWidth) + 1);
+            kbdRow = Math.min(numRows - 1, Math.floor((r.top + r.height / 2) / rowHeight));
+          }
+          kbdLink = -1;
+        }
+        // ArrowLeft: the listing hugs the screen edge; there is nothing to the left.
       } else {
         if (e.key === 'ArrowUp') {
           kbdRow = Math.max(0, kbdRow - 1);
@@ -297,10 +352,12 @@ function setupKeyboardNavigation() {
         } else if (e.key === 'ArrowRight') {
           kbdCol = Math.min(numCols - 1, kbdCol + 1);
         }
+        // Stepping onto the listing hands the cursor over to per-entry mode.
+        kbdLink = linkIndexAtPoint((kbdCol + 0.5) * colWidth, (kbdRow + 0.5) * rowHeight);
       }
 
       // Space / Enter press-down: depress the targeted letter (whatever cell it owns)
-      if (e.key === ' ' || e.key === 'Enter') {
+      if ((e.key === ' ' || e.key === 'Enter') && kbdLink < 0) {
         const letter = letterAtCell(kbdCol, kbdRow);
         if (letter) {
           pressedMesh = letter;
@@ -323,9 +380,8 @@ function setupKeyboardNavigation() {
         updateLetterRepresentations(pressedMesh);
         pressedMesh = null;
         updateCursorPosition();
-      } else {
-        const link = linkForCell(kbdCol, kbdRow);
-        if (link) openLink(link);
+      } else if (useKeyboardCursor && kbdLink >= 0) {
+        openLinkAt(kbdLink);
       }
     }
   });
@@ -367,25 +423,20 @@ function updateCursorPosition() {
   const clearLinkBlinks = () => {
     linkEls.forEach(el => el.classList.remove('blink-active'));
   };
-  const linkContentRect = (el) => el ? toContentRect(el.getBoundingClientRect()) : null;
-  const within = (r, x, y) => r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
 
   const { col, row } = activeCell();
-  // Mouse uses the precise pointer; keyboard uses the active cell's center.
-  const px = useKeyboardCursor ? (col + 0.5) * colWidth : mouseX;
-  const py = useKeyboardCursor ? (row + 0.5) * rowHeight : mouseY;
 
-  // 1. LINKS — generous multi-cell grid zone OR the link's own box; cursor fits the box.
-  for (const el of linkEls) {
-    const name = el.dataset.link;
-    const rect = linkContentRect(el);
-    if (rect && (linkForCell(col, row) === name || within(rect, px, py))) {
-      hovered3DLetterGroup = null;
-      clearLinkBlinks();
-      el.classList.add('blink-active');
-      setCursorRect(rect.left, rect.top, rect.width, rect.height);
-      return;
-    }
+  // 1. LINKS — the keyboard tracks its selected entry in kbdLink; the mouse
+  // resolves through the same generous zone map. The cursor fits the text box.
+  const linkIdx = useKeyboardCursor ? kbdLink : linkIndexAtPoint(mouseX, mouseY);
+  const linkEl = linkIdx >= 0 ? linkEls[linkIdx] : null;
+  if (linkEl) {
+    hovered3DLetterGroup = null;
+    clearLinkBlinks();
+    linkEl.classList.add('blink-active');
+    const rect = toContentRect(linkEl.getBoundingClientRect());
+    setCursorRect(rect.left, rect.top, rect.width, rect.height);
+    return;
   }
 
   // 2. LETTERS — each MASON CHEN glyph OWNS the grid cells it occupies, so the
@@ -1590,26 +1641,12 @@ function setupThreeEvents() {
   window.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mouseup', onMouseUp);
 
-  // Fire links whenever the stylized cursor is over them — either the generous
-  // multi-cell grid zone or the link's own box (matches the cursor snap logic).
+  // Fire links whenever the stylized cursor is over them (same zone map as the
+  // cursor snap logic).
   window.addEventListener('click', () => {
     if (!isStageTransitioned) return;
-    const { col, row } = activeCell();
-    const px = useKeyboardCursor ? (col + 0.5) * colWidth : mouseX;
-    const py = useKeyboardCursor ? (row + 0.5) * rowHeight : mouseY;
-    const hitLink = (el, name) => {
-      if (linkForCell(col, row) === name) return true;
-      if (!el) return false;
-      const r = toContentRect(el.getBoundingClientRect());
-      return px >= r.left && px <= r.left + r.width && py >= r.top && py <= r.top + r.height;
-    };
-    for (const el of document.querySelectorAll('.terminal-link[data-link]')) {
-      const name = el.dataset.link;
-      if (hitLink(el, name)) {
-        openLink(name);
-        break;
-      }
-    }
+    const idx = useKeyboardCursor ? kbdLink : linkIndexAtPoint(mouseX, mouseY);
+    if (idx >= 0) openLinkAt(idx);
   });
 
   window.addEventListener('touchstart', (e) => {

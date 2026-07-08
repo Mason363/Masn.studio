@@ -152,16 +152,16 @@ body.force-rotate #rotation-root {
   pointer-events: auto;
 }
 
-/* Links listing (percentages of the stage, which is sized in JS).
-   Each wrapper is pinned to the grid cells its link zone owns (rows 5-6 of the
-   strict 10x7 grid), so the visual list, the cursor snap, and the click zones
-   in main.js all agree. */
+/* Links listing: a terminal-style vertical stack in the area below the letter
+   row (grid rows 3-6 of the strict 10x7 grid). Hover/click zones are resolved
+   geometrically from the entry rows in main.js (linkIndexAtPoint); the font
+   size is set in px by resizeLinksList() so it scales with the viewport. */
 .links-line {
   position: absolute;
-  top: 0;
+  top: 42.857%;    /* 3/7 — everything under the MASON CHEN row */
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 57.143%; /* 4/7 */
   z-index: 100; /* High z-index to stay above canvas */
   font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, monospace;
   font-weight: 700;
@@ -169,31 +169,41 @@ body.force-rotate #rotation-root {
   pointer-events: none; /* Interaction is grid/cursor driven, not native hit-testing */
 }
 
-.link-wrapper {
+/* The listing shrink-wraps its widest line; 7 equal-height rows (prompt + 6). */
+.links-list {
   position: absolute;
-  height: 14.2857%; /* one grid row (1/7) */
+  left: 5.5%;
+  top: 0;
+  height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-.row-5 { top: 71.4286%; } /* grid row 5 */
-.row-6 { top: 85.7143%; } /* grid row 6 */
+.links-prompt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  font-size: 0.7em;
+  color: #ffffff;
+  opacity: 0.7;
+}
 
-.col-a { left: 0;   width: 30%; } /* grid columns 0-2 */
-.col-b { left: 30%; width: 40%; } /* grid columns 3-6 */
-.col-c { left: 70%; width: 30%; } /* grid columns 7-9 */
+.link-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
 
 .terminal-link {
   display: inline-block;
   color: #ffffff;
   text-decoration: none;
-  font-size: 1.15rem; /* Noticeably smaller, readable font size */
-  padding: 0.5rem 1rem;
+  padding: 0.05em 0.4em 0.05em 0.15em;
   transition: opacity 0.15s ease;
   box-sizing: border-box;
   /* The grid-driven window click handler opens links; disabling native pointer
-     events prevents a double-open and keeps the hit area aligned to the grid. */
+     events prevents a double-open and keeps the hit area aligned to the zones. */
   pointer-events: none;
 }
 
