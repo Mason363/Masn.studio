@@ -131,8 +131,8 @@ function applyViewport() {
   updateCursorPosition();
 }
 
-// The terminal listing scales with the viewport: each of its 7 lines (prompt +
-// 6 links) is 1/7 of the lower stage, and the glyphs fill ~60% of that line.
+// The terminal listing scales with the viewport: each of its 6 entry rows is
+// 1/6 of the lower stage, and the glyphs fill ~60% of that line.
 function resizeLinksList() {
   const line = document.querySelector('.links-line');
   if (line) line.style.fontSize = `${Math.max(13, Math.round(viewH * 0.048))}px`;
