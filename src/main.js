@@ -150,12 +150,26 @@ function letterIndexForCol(col) {
   return -1;
 }
 
+// The terminal link listing: each entry owns a zone of grid cells (row + column
+// span) that matches its .link-wrapper placement in the CSS, so cursor snapping,
+// keyboard navigation, and clicks all resolve through this single table.
+const LINKS = [
+  { name: 'github',     url: 'https://github.com/Mason363',         row: 5, colMin: 0, colMax: 2 },
+  { name: 'makerworld', url: 'https://makerworld.com/en/@roboting', row: 5, colMin: 3, colMax: 6 },
+  { name: 'tactile',    url: 'https://tactile.masn.studio',         row: 5, colMin: 7, colMax: 9 },
+  { name: 'pathstitch', url: 'https://pathstitch.masn.studio',      row: 6, colMin: 0, colMax: 2 },
+  { name: 'contour',    url: 'https://contour.masn.studio',         row: 6, colMin: 3, colMax: 6 },
+  { name: 'planar',     url: 'https://planar.masn.studio',          row: 6, colMin: 7, colMax: 9 },
+];
+
 function linkForCell(col, row) {
-  if (row === 5 || row === 6) {
-    if (col >= 1 && col <= 3) return 'github';
-    if (col >= 6 && col <= 8) return 'makerworld';
-  }
-  return null;
+  const hit = LINKS.find(l => row === l.row && col >= l.colMin && col <= l.colMax);
+  return hit ? hit.name : null;
+}
+
+function openLink(name) {
+  const link = LINKS.find(l => l.name === name);
+  if (link) window.open(link.url, '_blank');
 }
 
 function setCursorRect(left, top, width, height) {
@@ -311,8 +325,7 @@ function setupKeyboardNavigation() {
         updateCursorPosition();
       } else {
         const link = linkForCell(kbdCol, kbdRow);
-        if (link === 'github') window.open('https://github.com/Mason363', '_blank');
-        else if (link === 'makerworld') window.open('https://makerworld.com/en/@roboting', '_blank');
+        if (link) openLink(link);
       }
     }
   });
@@ -350,11 +363,9 @@ function updateCursorPosition() {
   // Links snap to their full box (which spans several grid cells); letters snap
   // to their projected 3D bounding box, so the cursor grows to fit whatever
   // animation is playing and the whole animated glyph stays clickable.
-  const githubLink = document.querySelector('.terminal-link[data-link="github"]');
-  const makerworldLink = document.querySelector('.terminal-link[data-link="makerworld"]');
+  const linkEls = document.querySelectorAll('.terminal-link[data-link]');
   const clearLinkBlinks = () => {
-    if (githubLink) githubLink.classList.remove('blink-active');
-    if (makerworldLink) makerworldLink.classList.remove('blink-active');
+    linkEls.forEach(el => el.classList.remove('blink-active'));
   };
   const linkContentRect = (el) => el ? toContentRect(el.getBoundingClientRect()) : null;
   const within = (r, x, y) => r && x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height;
@@ -364,27 +375,20 @@ function updateCursorPosition() {
   const px = useKeyboardCursor ? (col + 0.5) * colWidth : mouseX;
   const py = useKeyboardCursor ? (row + 0.5) * rowHeight : mouseY;
 
-  // 1. GITHUB link — generous multi-cell grid zone OR its own box; cursor fits the box.
-  const ghRect = linkContentRect(githubLink);
-  if (ghRect && (linkForCell(col, row) === 'github' || within(ghRect, px, py))) {
-    hovered3DLetterGroup = null;
-    clearLinkBlinks();
-    githubLink.classList.add('blink-active');
-    setCursorRect(ghRect.left, ghRect.top, ghRect.width, ghRect.height);
-    return;
+  // 1. LINKS — generous multi-cell grid zone OR the link's own box; cursor fits the box.
+  for (const el of linkEls) {
+    const name = el.dataset.link;
+    const rect = linkContentRect(el);
+    if (rect && (linkForCell(col, row) === name || within(rect, px, py))) {
+      hovered3DLetterGroup = null;
+      clearLinkBlinks();
+      el.classList.add('blink-active');
+      setCursorRect(rect.left, rect.top, rect.width, rect.height);
+      return;
+    }
   }
 
-  // 2. MAKERWORLD link
-  const mwRect = linkContentRect(makerworldLink);
-  if (mwRect && (linkForCell(col, row) === 'makerworld' || within(mwRect, px, py))) {
-    hovered3DLetterGroup = null;
-    clearLinkBlinks();
-    makerworldLink.classList.add('blink-active');
-    setCursorRect(mwRect.left, mwRect.top, mwRect.width, mwRect.height);
-    return;
-  }
-
-  // 3. LETTERS — each MASON CHEN glyph OWNS the grid cells it occupies, so the
+  // 2. LETTERS — each MASON CHEN glyph OWNS the grid cells it occupies, so the
   // background grid never fights the cursor in those cells. The cursor snaps to
   // the letter's box (grid-cell sized at rest, growing to fit any animation).
   const letter = letterAtCell(col, row);
@@ -397,7 +401,7 @@ function updateCursorPosition() {
     return;
   }
 
-  // 4. Fallback: strict grid cell (empty space only).
+  // 3. Fallback: strict grid cell (empty space only).
   hovered3DLetterGroup = null;
   clearLinkBlinks();
   setCursorRect(col * colWidth, row * rowHeight, colWidth, rowHeight);
@@ -1599,10 +1603,13 @@ function setupThreeEvents() {
       const r = toContentRect(el.getBoundingClientRect());
       return px >= r.left && px <= r.left + r.width && py >= r.top && py <= r.top + r.height;
     };
-    const gh = document.querySelector('.terminal-link[data-link="github"]');
-    const mw = document.querySelector('.terminal-link[data-link="makerworld"]');
-    if (hitLink(gh, 'github')) window.open('https://github.com/Mason363', '_blank');
-    else if (hitLink(mw, 'makerworld')) window.open('https://makerworld.com/en/@roboting', '_blank');
+    for (const el of document.querySelectorAll('.terminal-link[data-link]')) {
+      const name = el.dataset.link;
+      if (hitLink(el, name)) {
+        openLink(name);
+        break;
+      }
+    }
   });
 
   window.addEventListener('touchstart', (e) => {
