@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>masn.studio — support</title>
+<meta name="description" content="Support for masn.studio and its apps. Questions, bugs, or requests — reach out any time.">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="canonical" href="https://masn.studio/support">
+<style>
+  :root { --fg: #fff; --dim: #8a8a8a; --bg: #000; --link: #fff; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, monospace;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    line-height: 1.7; font-size: 15px;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 48px 22px 96px; }
+  .prompt { color: var(--dim); letter-spacing: .06em; font-size: 13px; margin: 0 0 30px; }
+  .prompt .p { color: var(--fg); opacity: .8; }
+  .cursor {
+    display: inline-block; width: .55em; height: 1.05em; background: var(--fg);
+    vertical-align: -0.18em; margin-left: .2em; animation: blink 1.06s steps(2, start) infinite;
+  }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: .04em; margin: 0 0 6px; }
+  .sub { color: var(--dim); font-size: 13px; margin: 0 0 34px; }
+
+  h2 {
+    font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: lowercase;
+    color: var(--fg); margin: 36px 0 8px;
+  }
+  h2::before { content: "# "; color: var(--dim); }
+  p { margin: 0 0 14px; color: #e8e8e8; }
+  .lead { color: var(--fg); }
+  strong { color: #fff; font-weight: 700; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid #555; }
+  a:hover { border-bottom-color: var(--fg); }
+  :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+  /* The reach-out call to action — a terminal-style contact line */
+  .reach {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: .35em .55em;
+    margin: 4px 0 8px; padding: 18px 20px;
+    border: 1px solid #222; background: #0a0a0a;
+  }
+  .reach .arrow { color: var(--dim); }
+  .reach a {
+    font-size: 19px; font-weight: 700; letter-spacing: .01em;
+    border-bottom: 1px solid #444; word-break: break-all;
+  }
+  .reach a:hover { border-bottom-color: var(--fg); }
+
+  ul { margin: 0 0 14px; padding-left: 1.3em; color: #e8e8e8; }
+  li { margin: 0 0 6px; }
+  li::marker { color: var(--dim); }
+
+  hr { border: none; border-top: 1px solid #222; margin: 44px 0 22px; }
+  .foot { color: var(--dim); font-size: 13px; }
+  .foot a { color: var(--dim); border-bottom-color: #333; }
+  .foot a:hover { color: var(--fg); }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <p class="prompt"><span class="p">%</span> cat support.txt<span class="cursor"></span></p>
+
+    <h1>Support</h1>
+    <p class="sub">Help for masn.studio and everything it ships.</p>
+
+    <p class="lead">Something not working, a question, or an idea? This is the place. masn.studio is a solo studio, so your note goes straight to me — no ticket queue, no bots.</p>
+
+    <h2>reach out</h2>
+    <p>The fastest way to get help is email. Tell me what you were doing and what went wrong, and I'll take it from there.</p>
+    <p class="reach">
+      <span class="arrow">reach out&nbsp;&rarr;</span>
+      <a href="mailto:masonchen204@gmail.com">masonchen204@gmail.com</a>
+    </p>
+
+    <h2>what helps</h2>
+    <p>To sort things out faster, it helps to include:</p>
+    <ul>
+      <li>which app or page you were using</li>
+      <li>your device and OS version</li>
+      <li>what you expected, and what happened instead</li>
+      <li>a screenshot or screen recording, if you have one</li>
+    </ul>
+
+    <h2>response time</h2>
+    <p>I read every message and usually reply within a couple of days. Bug reports and feature ideas are always welcome — a lot of what these apps do started as someone's email.</p>
+
+    <hr>
+    <p class="foot"><a href="https://masn.studio">masn.studio</a></p>
+  </main>
+</body>
+</html>
