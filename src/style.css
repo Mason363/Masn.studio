@@ -169,7 +169,7 @@ body.force-rotate #rotation-root {
   pointer-events: none; /* Interaction is grid/cursor driven, not native hit-testing */
 }
 
-/* The listing shrink-wraps its widest line; 6 equal-height entry rows. */
+/* The listing shrink-wraps its widest line; equal-height entry rows. */
 .links-list {
   position: absolute;
   left: 5.5%;

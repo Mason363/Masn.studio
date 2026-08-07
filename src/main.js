@@ -26,8 +26,8 @@ let useKeyboardCursor = false;
 let kbdCol = 0;
 let kbdRow = 0;
 // Selected entry in the vertical link stack (-1 = keyboard cursor is on the
-// plain grid). The stack has 6 entries in 4 grid rows, so inside it the cursor
-// steps per entry instead of per row.
+// plain grid). The stack packs its entries into 4 grid rows, so inside it the
+// cursor steps per entry instead of per row.
 let kbdLink = -1;
 
 // Elements
@@ -131,8 +131,8 @@ function applyViewport() {
   updateCursorPosition();
 }
 
-// The terminal listing scales with the viewport: each of its 6 entry rows is
-// 1/6 of the lower stage, and the glyphs fill ~60% of that line.
+// The terminal listing scales with the viewport: its entry rows split the lower
+// stage evenly (flex: 1 each), and the glyphs fill ~60% of that line.
 function resizeLinksList() {
   const line = document.querySelector('.links-line');
   if (line) line.style.fontSize = `${Math.max(13, Math.round(viewH * 0.048))}px`;
@@ -169,6 +169,7 @@ function letterIndexForCol(col) {
 const LINKS = [
   { name: 'github',     url: 'https://github.com/Mason363' },
   { name: 'makerworld', url: 'https://makerworld.com/en/@roboting' },
+  { name: 'coast',      url: 'https://coast.masn.studio' },
   { name: 'tactile',    url: 'https://tactile.masn.studio' },
   { name: 'pathstitch', url: 'https://pathstitch.masn.studio' },
   { name: 'contour',    url: 'https://contour.masn.studio' },
