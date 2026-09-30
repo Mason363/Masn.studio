@@ -1,9 +1,7 @@
-# Mason Chen — Interactive Terminal Portfolio
+# Mason Chen — Portfolio
 
-A single-page portfolio reimagined as a retro-futuristic terminal. It boots like a
-console, types out a `whoami`, then drops you into an interactive 3D scene where the
-name **MASON CHEN** is rendered as tactile letters you can click to morph through
-eight distinct visual styles — all navigated with a custom, grid-snapping block cursor.
+My portfolio. It types out `whoami`, then shows **MASON CHEN** as letters you can
+click through eight styles, with links to my projects below.
 
 🔗 **Live:** [masn.studio](https://masn.studio) · [GitHub](https://github.com/Mason363) · [MakerWorld](https://makerworld.com/en/@roboting)
 
@@ -13,7 +11,7 @@ eight distinct visual styles — all navigated with a custom, grid-snapping bloc
 
 - **Boot sequence** — a command-line splash types `% whoami` character by character,
   then "scrolls" into the main stage in discrete, mechanical increments.
-- **Interactive 3D type** — `MASON CHEN` is built procedurally with Three.js. Click
+- **Clickable letters** — `MASON CHEN` is built procedurally with Three.js. Click
   (or arrow-key + `Space`/`Enter`) any letter to cycle it through 8 styles.
 - **Custom block cursor** — the native pointer is hidden and replaced by a cursor that
   snaps to a strict 10×7 grid, locking onto letters and links as you move.
@@ -45,7 +43,8 @@ Each letter animates between these representations, in order:
 | Click a letter | Cycle that letter to its next style |
 | Arrow keys | Move the cursor cell by cell across the grid |
 | `Space` / `Enter` | Activate the focused letter (same as a click) |
-| Click `GITHUB` / `MAKERWORLD` | Open the respective profile |
+| Click a link | Open that project or profile |
+| Click `contact me` | Draft an email to me |
 
 ## Tech stack
 

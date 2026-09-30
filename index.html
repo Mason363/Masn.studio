@@ -4,26 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <title>Mason Chen — Interactive Portfolio</title>
-    <meta name="description" content="Mason Chen's portfolio — an interactive 3D terminal built with Three.js. Explore engineering projects, MakerWorld designs, and GitHub code." />
+    <title>Mason Chen — Portfolio</title>
+    <meta name="description" content="Mason Chen's portfolio: Mac apps, NumWorks calculator games, and 3D-printable designs." />
     <meta name="author" content="Mason Chen" />
-    <meta name="keywords" content="Mason Chen, portfolio, robotics, 3D printing, MakerWorld, engineering, interactive, Three.js" />
     <link rel="canonical" href="https://masn.studio" />
 
-    <!-- Open Graph / Social previews -->
+    <!-- Open Graph / Social previews (X falls back to these for its card) -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://masn.studio" />
-    <meta property="og:title" content="Mason Chen — Interactive Portfolio" />
-    <meta property="og:description" content="An interactive 3D terminal portfolio. Click the letters, explore the links." />
+    <meta property="og:title" content="Mason Chen — Portfolio" />
+    <meta property="og:description" content="Mason Chen's portfolio: Mac apps, NumWorks calculator games, and 3D-printable designs." />
     <meta property="og:image" content="https://masn.studio/og-preview.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-
-    <!-- Twitter card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Mason Chen — Interactive Portfolio" />
-    <meta name="twitter:description" content="An interactive 3D terminal portfolio. Click the letters, explore the links." />
-    <meta name="twitter:image" content="https://masn.studio/og-preview.png" />
+
+    <!-- Structured data: ties the name to its profiles in search results -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Person",
+        "name": "Mason Chen",
+        "url": "https://masn.studio",
+        "sameAs": [
+          "https://github.com/Mason363",
+          "https://makerworld.com/en/@roboting"
+        ]
+      }
+    </script>
   </head>
   <body>
     <!-- Rotation root: rotated 90deg on portrait devices to force landscape -->
@@ -41,9 +49,9 @@
         <!-- STAGE 1: THE COMMAND -->
         <section id="stage-1" class="stage">
           <div class="stage-content">
-            <h1 class="command-line" aria-label="% whoami">
+            <div class="command-line" aria-hidden="true">
               <span class="prompt-char">%</span><span class="space-char">&nbsp;</span><span id="typewriter-text"></span>
-            </h1>
+            </div>
           </div>
         </section>
 
@@ -51,7 +59,7 @@
         <section id="stage-2" class="stage">
           <div class="stage-content">
             <!-- Accessible off-screen title -->
-            <h2 class="sr-only">Mason Chen</h2>
+            <h1 class="sr-only">Mason Chen</h1>
             
             <!-- Three.js Canvas for 3D tactile letters of MASON CHEN -->
             <div id="three-canvas-container"></div>
