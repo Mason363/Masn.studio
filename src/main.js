@@ -132,10 +132,14 @@ function applyViewport() {
 }
 
 // The terminal listing scales with the viewport: its entry rows split the lower
-// stage evenly (flex: 1 each), and the glyphs fill ~60% of that line.
+// stage evenly (flex: 1 each), and the glyphs fill ~60% of that line. The
+// contact entry takes one row's height so it lines up with the last entry.
 function resizeLinksList() {
   const line = document.querySelector('.links-line');
   if (line) line.style.fontSize = `${Math.max(13, Math.round(viewH * 0.048))}px`;
+  const contactWrapper = document.querySelector('.contact-wrapper');
+  const rows = document.querySelectorAll('.link-wrapper').length;
+  if (contactWrapper && rows) contactWrapper.style.height = `${100 / rows}%`;
 }
 
 function setupViewport() {
@@ -172,8 +176,7 @@ const LINKS = [
   { name: 'coast',      url: 'https://coast.masn.studio' },
   { name: 'tactile',    url: 'https://tactile.masn.studio' },
   { name: 'pathstitch', url: 'https://pathstitch.masn.studio' },
-  { name: 'contour',    url: 'https://contour.masn.studio' },
-  { name: 'planar',     url: 'https://planar.masn.studio' },
+  { name: 'numplay',    url: 'https://mason363.github.io/NumPlay/' },
 ];
 
 function openLinkAt(index) {
@@ -202,6 +205,31 @@ function linkIndexAtPoint(x, y) {
   if (x < 0 || x > right || y < top || y > bottom) return -1;
   const idx = Math.floor((y - top) / ((bottom - top) / wrappers.length));
   return Math.max(0, Math.min(wrappers.length - 1, idx));
+}
+
+// The contact button in the bottom-right corner. Its zone is every grid cell
+// the button overlaps, so the mouse and the keyboard cursor land on it from
+// any of those cells.
+const contactButton = document.querySelector('.contact-button');
+
+function contactCells() {
+  if (!contactButton) return null;
+  const r = toContentRect(contactButton.getBoundingClientRect());
+  return {
+    col0: Math.floor(r.left / colWidth),
+    col1: Math.floor((r.left + r.width - 1) / colWidth),
+    row0: Math.floor(r.top / rowHeight),
+    row1: Math.floor((r.top + r.height - 1) / rowHeight),
+  };
+}
+
+function isContactCell(col, row) {
+  const c = contactCells();
+  return !!c && col >= c.col0 && col <= c.col1 && row >= c.row0 && row <= c.row1;
+}
+
+function openContact() {
+  window.location.href = contactButton.href;
 }
 
 function setCursorRect(left, top, width, height) {
@@ -344,14 +372,16 @@ function setupKeyboardNavigation() {
         }
         // ArrowLeft: the listing hugs the screen edge; there is nothing to the left.
       } else {
+        // On the contact button, step off from its edge so its cells act as one.
+        const c = isContactCell(kbdCol, kbdRow) ? contactCells() : null;
         if (e.key === 'ArrowUp') {
-          kbdRow = Math.max(0, kbdRow - 1);
+          kbdRow = Math.max(0, (c ? c.row0 : kbdRow) - 1);
         } else if (e.key === 'ArrowDown') {
-          kbdRow = Math.min(numRows - 1, kbdRow + 1);
+          kbdRow = Math.min(numRows - 1, (c ? c.row1 : kbdRow) + 1);
         } else if (e.key === 'ArrowLeft') {
-          kbdCol = Math.max(0, kbdCol - 1);
+          kbdCol = Math.max(0, (c ? c.col0 : kbdCol) - 1);
         } else if (e.key === 'ArrowRight') {
-          kbdCol = Math.min(numCols - 1, kbdCol + 1);
+          kbdCol = Math.min(numCols - 1, (c ? c.col1 : kbdCol) + 1);
         }
         // Stepping onto the listing hands the cursor over to per-entry mode.
         kbdLink = linkIndexAtPoint((kbdCol + 0.5) * colWidth, (kbdRow + 0.5) * rowHeight);
@@ -383,6 +413,8 @@ function setupKeyboardNavigation() {
         updateCursorPosition();
       } else if (useKeyboardCursor && kbdLink >= 0) {
         openLinkAt(kbdLink);
+      } else if (useKeyboardCursor && isContactCell(kbdCol, kbdRow)) {
+        openContact();
       }
     }
   });
@@ -423,6 +455,7 @@ function updateCursorPosition() {
   const linkEls = document.querySelectorAll('.terminal-link[data-link]');
   const clearLinkBlinks = () => {
     linkEls.forEach(el => el.classList.remove('blink-active'));
+    if (contactButton) contactButton.classList.remove('blink-active');
   };
 
   const { col, row } = activeCell();
@@ -440,7 +473,17 @@ function updateCursorPosition() {
     return;
   }
 
-  // 2. LETTERS — each MASON CHEN glyph OWNS the grid cells it occupies, so the
+  // 2. CONTACT — any cell the button covers snaps the cursor to its full box.
+  if (isContactCell(col, row)) {
+    hovered3DLetterGroup = null;
+    clearLinkBlinks();
+    contactButton.classList.add('blink-active');
+    const rect = toContentRect(contactButton.getBoundingClientRect());
+    setCursorRect(rect.left, rect.top, rect.width, rect.height);
+    return;
+  }
+
+  // 3. LETTERS — each MASON CHEN glyph OWNS the grid cells it occupies, so the
   // background grid never fights the cursor in those cells. The cursor snaps to
   // the letter's box (grid-cell sized at rest, growing to fit any animation).
   const letter = letterAtCell(col, row);
@@ -453,7 +496,7 @@ function updateCursorPosition() {
     return;
   }
 
-  // 3. Fallback: strict grid cell (empty space only).
+  // 4. Fallback: strict grid cell (empty space only).
   hovered3DLetterGroup = null;
   clearLinkBlinks();
   setCursorRect(col * colWidth, row * rowHeight, colWidth, rowHeight);
@@ -1647,7 +1690,9 @@ function setupThreeEvents() {
   window.addEventListener('click', () => {
     if (!isStageTransitioned) return;
     const idx = useKeyboardCursor ? kbdLink : linkIndexAtPoint(mouseX, mouseY);
+    const { col, row } = activeCell();
     if (idx >= 0) openLinkAt(idx);
+    else if (isContactCell(col, row)) openContact();
   });
 
   window.addEventListener('touchstart', (e) => {

@@ -198,6 +198,17 @@ body.force-rotate #rotation-root {
   pointer-events: none;
 }
 
+/* Contact: mirrors the listing on the right edge, sharing the last entry's row
+   (its height is set to one row by resizeLinksList()). Hover/click are resolved
+   by the grid cursor in main.js (contactCells). */
+.contact-wrapper {
+  position: absolute;
+  right: 5.5%;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+}
+
 /* Blinking for hovered links — paced like a typing cursor (~1s period) */
 @keyframes link-blink {
   0%, 49% {
